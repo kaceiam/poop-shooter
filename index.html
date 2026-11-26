@@ -34,6 +34,9 @@ const ANIMALS = [
   { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true },
   // The skunk's poop leaves a stink cloud that splats anyone who walks into it.
   { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true },
+  // Shop animals (cost coins). The duck's poop bounces to a second spot, like skipping a stone.
+  { name: 'Duck',     emoji: '🦆', food: '🍞', foodName: 'bread', maxAmmo: 3, perFood: 1, splat: 32, speed: 1.3, bounce: true,
+    price: 60, shopText: 'Poop bounces to a 2nd spot' },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
@@ -176,7 +179,7 @@ const ui = () => Math.max(0.6, Math.min(1, W / 900, H / 700));   // 1 = full siz
 const horizon = () => H * 0.28;
 const animalPos = () => { const u = ui(); return { x: Math.max(85 * u + 10, Math.min(W * 0.2, 170)), y: H - 95 * u }; };
 const bowlPos = () => { const u = ui(); return { x: W - Math.max(65 * u + 15, Math.min(W * 0.18, 150)), y: H - 80 * u }; };
-const btnSize = () => Math.min(56 * Math.max(ui(), 0.8), W / 9);
+const btnSize = () => Math.min(56 * Math.max(ui(), 0.8), W / 9, (W - 16) / ANIMALS.length - 8);   // all buttons fit
 const BTN_GAP = 8;
 const gapLeft = () => animalPos().x + 85 * ui();       // right edge of the pocket hole
 const gapRight = () => bowlPos().x - 65 * ui();        // left edge of the bowl
@@ -264,6 +267,11 @@ function shoot(tx, ty) {
 function land(p) {
   splats.push({ x: p.tx, y: p.ty, size: p.size, life: 4, magic: !!ANIMALS[p.animal].homing });
   if (ANIMALS[p.animal].stink) clouds.push({ x: p.tx, y: p.ty, r: 60, life: 3, got: new Set() });   // skunk!
+  if (ANIMALS[p.animal].bounce && !p.bounced) {        // duck: hop forward to a second spot
+    const tx = Math.max(20, Math.min(W - 20, p.tx + (p.tx - p.sx) * 0.4));
+    const ty = Math.max(horizon() + 20, Math.min(pocketTop() - 20, p.ty + (p.ty - p.sy) * 0.4));
+    poops.push({ sx: p.tx, sy: p.ty, tx, ty, t: 0, dur: 0.35, size: p.size, animal: p.animal, bounced: true });
+  }
   sfx('splat');
   let hits = 0;
   for (const person of people) {
@@ -768,7 +776,7 @@ function drawShop() {
     ctx.beginPath(); ctx.roundRect(left - 8, y - rowH / 2 + 4, Math.min(W - 16, 416), rowH - 8, 12); ctx.fill();
     emoji(a.emoji, left + 24, y, Math.min(44, rowH * 0.7));
     label(a.name, left + 60, y - fs * 0.45, fs, '#fff', true, 'left');
-    label(a.spread ? 'Throws 3 poops at once' : a.homing ? 'Magic poop follows people' : 'Stink cloud splats walkers',
+    label(a.shopText,
       left + 60, y + fs * 0.6, fs * 0.7, '#ccc', false, 'left');
     label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
   });
@@ -928,7 +936,7 @@ function drawPocket() {
 function drawPoopFlying(p) {
   const k = p.t / p.dur;
   const x = p.sx + (p.tx - p.sx) * k;
-  const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * 120;
+  const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * (p.bounced ? 45 : 120);   // a bounce is a small hop
   const size = (p.size * 0.9) * (1 - k * 0.45);
   if (ANIMALS[p.animal].homing) emoji('✨', x - (p.tx - p.sx) * 0.06, y + 14, size * 0.8);   // magic sparkles
   emoji('💩', x, y, size);
@@ -1015,7 +1023,7 @@ function draw() {
       } else {
         y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
         y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-        y = para('Switch animals with 1-7 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+        y = para('Switch animals with 1-8 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       }
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
       if (short) y -= Math.min(32, W / 16) * 0.5;
