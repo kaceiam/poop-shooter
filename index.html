@@ -61,6 +61,8 @@ const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
 const place = () => PLACES[Math.floor((level - 1) / 2) % PLACES.length];
 const YUCKS = ['EWW!', 'GROSS!', 'NOOO!', 'MY SHIRT!', 'YUCK!', 'WHY?!', 'EW EW EW'];
+const SKATER_YUCKS = ['WIPEOUT!', 'MY BOARD!', 'WHOA!'];
+const UMBRELLA_YUCKS = ['NOT FAIR!', 'MY UMBRELLA!', 'TWO POOPS?!'];
 // ---- Levels: reach the goal before time runs out to go to the next level ----
 const LEVEL_TIME = 40;
 let level = 1, levelScore = 0, bannerTime = 0;
@@ -130,6 +132,7 @@ function sfx(kind, animal) {
   if (kind === 'power')  [660, 880, 1100, 1320, 1760].forEach((f, i) => tone('triangle', f, f, 0.1, 0.1, i * 0.05));
   if (kind === 'boss')   { tone('sawtooth', 110, 98, 0.5, 0.12); tone('sawtooth', 82, 73, 0.6, 0.12, 0.45); }
   if (kind === 'magic')  [880, 1175, 1568].forEach((f, i) => tone('sine', f, f * 1.02, 0.15, 0.08, i * 0.06));
+  if (kind === 'boing')  { tone('sine', 250, 700, 0.15, 0.25); tone('sine', 700, 350, 0.15, 0.15, 0.15); }
   if (kind === 'dodge')  { noise(0.15, 3000, 0.2); tone('sine', 500, 1200, 0.12, 0.08); }
   if (kind === 'switch') tone('sine', 600, 900, 0.08, 0.15);
   if (kind === 'level')  [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f * 1.01, 0.16, 0.07, i * 0.16));
@@ -177,11 +180,16 @@ function spawnPerson() {
   const prop = Math.random() < 0.6 ? here.props[Math.floor(Math.random() * here.props.length)] : null;
   const runner = emoji.startsWith('🏃');
   const dodger = !runner && Math.random() < dodgeChance();
+  // Special people: umbrella people block one poop, skaters zoom by.
+  const roll = Math.random();
+  const umbrella = !runner && !dodger && roll < 0.1;
+  const skater = !runner && !dodger && !umbrella && roll < 0.18;
+  let speed = (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5) * speedBoost();
+  if (skater) speed *= 2.2;
   people.push({
-    x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji, prop,
-    speed: (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5) * speedBoost(),
-    points: runner ? 3 : dodger ? 2 : 1, hit: false, bob: Math.random() * 6,
-    dodger, dodgeTime: 0, dodgeDir: 1, dodgeSpeed: 0, pause: 0, cool: 0,
+    x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji: skater ? '🧍' : emoji, prop: umbrella || skater ? null : prop,
+    speed, points: runner || skater ? 3 : dodger || umbrella ? 2 : 1, hit: false, bob: Math.random() * 6,
+    dodger, umbrella, hadUmbrella: umbrella, skater, dodgeTime: 0, dodgeDir: 1, dodgeSpeed: 0, pause: 0, cool: 0,
   });
   people.sort((a, b) => a.y - b.y);                  // far people drawn first
 }
@@ -243,8 +251,7 @@ function land(p) {
     const bodyY = person.y - size * 0.45;
     if (Math.abs(person.x - p.tx) < size * 0.4 + p.size * 0.4 &&
         Math.abs(bodyY - p.ty) < size * 0.55 + p.size * 0.3) {
-      strike(person, !hits, p.tx, p.ty);
-      hits++;
+      if (strike(person, !hits, p.tx, p.ty)) hits++;   // a poop that bounces off an umbrella doesn't count
     }
   }
   if (hits) sfx('eww');
@@ -252,14 +259,20 @@ function land(p) {
 }
 
 // What happens when poop (or a stink cloud) gets someone.
-function strike(person, countsForStreak, x, y) {
+function strike(person, countsForStreak, x, y, fromCloud) {
   const size = 70 * person.scale;
+  if (person.umbrella && !fromCloud) {                 // the umbrella blocks one poop (but not a stink cloud)
+    person.umbrella = false;
+    addText(person.x, person.y - size - 10, 'BOING! ☂️', '#9ff');
+    sfx('boing');
+    return false;
+  }
   if (countsForStreak) bumpStreak(x, y);
   if (tut === 1) tut = 2;
   if (person.boss && person.hp > 1) {                  // the boss needs 3 hits
     person.hp--; person.flash = 0.3;
     addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
-    return;
+    return true;
   }
   if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); }
   if (person.dodger) countStat('dodgers', 5, 'dodger5');
@@ -268,8 +281,10 @@ function strike(person, countsForStreak, x, y) {
   person.dir = person.x < W / 2 ? -1 : 1;              // run off the nearest side
   person.speed = 320; person.dodgeTime = 0; person.pause = 0;
   const got = addPoints(person.points * (person.boss ? 1 : Math.min(3, streak)));   // boss is always 10
-  addText(person.x, person.y - size - 10, YUCKS[Math.floor(Math.random() * YUCKS.length)], '#fff');
+  const words = person.skater ? SKATER_YUCKS : person.hadUmbrella ? UMBRELLA_YUCKS : YUCKS;
+  addText(person.x, person.y - size - 10, words[Math.floor(Math.random() * words.length)], '#fff');
   addText(person.x, person.y - size - 40, '+' + got, '#ffe14d');
+  return true;
 }
 
 // Skunk stink clouds hang around for a few seconds. Anyone who walks in gets splatted (once per cloud).
@@ -282,7 +297,7 @@ function updateClouds(dt) {
       const bodyY = person.y - 70 * person.scale * 0.45;
       if (Math.hypot(person.x - c.x, (bodyY - c.y) * 1.5) < c.r + 20 * person.scale) {
         c.got.add(person);
-        strike(person, true, c.x, c.y);
+        strike(person, true, c.x, c.y, true);
         sfx('eww');
       }
     }
@@ -828,6 +843,8 @@ function draw() {
       continue;
     }
     if (p.prop) emoji(p.prop, p.x + p.dir * size * 0.28, p.y - size * 0.35 - bob, size * 0.38);   // what they carry
+    if (p.umbrella) emoji('☂️', p.x, p.y - size * 1.05 - bob, size * 0.7);
+    if (p.skater) emoji('🛹', p.x, p.y + size * 0.04, size * 0.65, p.dir === 1);
     if (p.hit) emoji('💩', p.x, p.y - size * 0.95 - bob, size * 0.45);   // poop on their head!
   }
   for (const pu of powerups) {
