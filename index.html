@@ -705,10 +705,11 @@ function drawShop() {
   label('🛒 Animal Shop', W / 2, 44, Math.min(34, W / 12), '#9ff');
   label(`You have 🪙 ${coins} coins`, W / 2, 82, Math.min(20, W / 20), '#ffe14d');
   const list = ANIMALS.filter(a => a.price);
-  const rowH = Math.min(70, (H - 200) / list.length), fs = Math.min(20, W / 20), left = Math.max(16, W / 2 - 200);
+  const top = H < 520 ? 104 : 130;                     // leave room for the message at the bottom
+  const rowH = Math.min(70, (H - top - 100) / list.length), fs = Math.min(20, W / 20, rowH * 0.36), left = Math.max(16, W / 2 - 200);
   shopRows = [];
   list.forEach((a, i) => {
-    const y = 130 + i * rowH + rowH / 2, have = isOwned(a), afford = coins >= a.price;
+    const y = top + i * rowH + rowH / 2, have = isOwned(a), afford = coins >= a.price;
     shopRows.push({ a, y, h: rowH });
     ctx.fillStyle = have ? 'rgba(105,240,174,0.15)' : 'rgba(255,255,255,0.08)';
     ctx.beginPath(); ctx.roundRect(left - 8, y - rowH / 2 + 4, Math.min(W - 16, 416), rowH - 8, 12); ctx.fill();
@@ -718,16 +719,20 @@ function drawShop() {
       left + 60, y + fs * 0.6, fs * 0.7, '#ccc', false, 'left');
     label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
   });
-  if (shopMsg) para(shopMsg, W / 2, H - 70, Math.min(18, W / 22), '#ffe14d', W - 32);
+  if (shopMsg) para(shopMsg, W / 2, H - 62, Math.min(18, W / 22), '#ffe14d', W - 32);
   label('Tap an animal to buy it · tap anywhere else to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
 }
 function drawTrophies() {
   ctx.fillStyle = '#1e1205'; ctx.fillRect(0, 0, W, H);
-  const rowH = Math.min(52, (H - 140) / ACHIEVEMENTS.length), fs = Math.min(18, W / 24);
+  // Short screens show two columns so the rows don't squash together.
+  const cols = (H - 140) / ACHIEVEMENTS.length < 40 && W > 600 ? 2 : 1;
+  const perCol = Math.ceil(ACHIEVEMENTS.length / cols);
+  const rowH = Math.min(52, (H - 140) / perCol), fs = Math.min(18, W / 24 / cols * 1.4, rowH * 0.42);
   label(`🏆 Achievements ${unlocked.size}/${ACHIEVEMENTS.length}`, W / 2, 50, Math.min(36, W / 12), '#ffe14d');
-  const left = Math.max(16, W / 2 - 220);
+  const colW = cols === 2 ? W / 2 : W;
   ACHIEVEMENTS.forEach((a, i) => {
-    const y = 100 + i * rowH, got = unlocked.has(a.id);
+    const col = Math.floor(i / perCol), left = col * colW + Math.max(16, colW / 2 - (cols === 2 ? 150 : 220));
+    const y = 100 + (i % perCol) * rowH, got = unlocked.has(a.id);
     ctx.globalAlpha = got ? 1 : 0.45;
     emoji(got ? a.icon : '🔒', left + 16, y, Math.min(30, rowH * 0.7));
     label(a.name, left + 44, y - fs * 0.45, fs, got ? '#ffe14d' : '#fff', true, 'left');
