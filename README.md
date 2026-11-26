@@ -43,4 +43,6 @@ Tap **❓ Help** on the start screen (or press ?) for a how-to-play guide. Press
 | 🦘 Kangaroo (shop, 250 🪙) | leaves 🍃 | 2 | boomerang poop: splats, then swoops back and splats again |
 | 🐉 Dragon (shop, 300 🪙) | peppers 🌶️ | 2 | chain poop: after a hit, fiery poops jump to 2 more people nearby |
 
+Each animal levels up as you splat people with it (Lv 1 to Lv 5 at 15, 40, 80 and 150 splats). Every level makes its splats 5% bigger.
+
 Want to change how strong they are? Open `index.html` and look for `ANIMALS` near the top.

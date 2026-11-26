@@ -420,7 +420,7 @@ function shoot(tx, ty) {
   const dist = Math.hypot(tx - start.x, ty - start.y);
   const floaty = !!place().lowGravity, sink = !!place().underwater;   // moon: big floaty arcs, reef: slow wobbly sinking
   const dur = (0.35 + dist / 1400) / a.speed * (floaty ? 1.4 : sink ? 1.6 : 1);
-  const size = superTime > 0 ? Math.max(100, a.splat * 1.8) : a.splat;   // super poop = giant splats
+  const size = superTime > 0 ? Math.max(100, a.splat * 1.8) : a.splat * levelBoost(a);   // super poop = giant splats; higher animal levels splat a bit bigger
   const make = (x, y) => ({ sx: start.x, sy: start.y - 30 * ui(), tx: x, ty: y, t: 0, dur, size, animal: current, floaty, sink });
   if (a.line) {                                        // bat: a line of poops dropped from the sky, one after another
     for (let i = 0; i < a.line; i++) {
@@ -545,6 +545,7 @@ function strike(person, countsForStreak, x, y, fromCloud) {
   if (person.hadUmbrella) dailyEvent('umbrellas');
   dailyEvent('splat');
   life.splats++;
+  gainXP(ANIMALS[current]);                            // the animal you're using gets closer to its next level
   if (mode === 'zen') { zenSplats++; if (zenSplats % 20 === 0) zenNextPlace(); }   // zen: somewhere new every 20 splats
   const type = personType(person); round.types[type] = (round.types[type] || 0) + 1;
   unlock('first');
@@ -613,6 +614,34 @@ function unlock(id) {
   toast = { msg: `🏆 Achievement! ${a.icon} ${a.name}`, time: 3 };
   sfx('power');
 }
+// ---- Animal levels: splatting people with an animal levels it up (Lv 1-5) ----
+// Each level makes its splats 5% bigger (Lv 5 = 20% bigger). Saved on this computer.
+const LEVEL_AT = [0, 15, 40, 80, 150];                 // splats needed for Lv 1, 2, 3, 4, 5
+let animalXP = {};
+try { animalXP = JSON.parse(localStorage.getItem('poopAnimalXP') || '{}'); } catch (e) {}
+const animalLevel = a => LEVEL_AT.filter(n => (animalXP[a.name] || 0) >= n).length;
+const levelBoost = a => 1 + 0.05 * (animalLevel(a) - 1);
+function gainXP(a) {
+  const before = animalLevel(a);
+  animalXP[a.name] = (animalXP[a.name] || 0) + 1;
+  try { localStorage.setItem('poopAnimalXP', JSON.stringify(animalXP)); } catch (e) {}
+  if (animalLevel(a) > before) {
+    toast = { msg: `${a.emoji} ${a.name} reached Lv ${animalLevel(a)}! Bigger splats!`, time: 3 };
+    sfx('level');
+  }
+}
+function drawLevelBadge(a, pos, u) {
+  const lv = animalLevel(a), x = pos.x - 70 * u, y = pos.y - 62 * u;
+  ctx.fillStyle = lv >= 5 ? '#ffd54f' : 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.roundRect(x - 26, y - 11, 52, 22, 8); ctx.fill();
+  label(`Lv ${lv}`, x, y, 13, lv >= 5 ? '#5d4037' : '#fff', false);
+  if (lv < 5) {                                        // progress toward the next level
+    const have = (animalXP[a.name] || 0) - LEVEL_AT[lv - 1], need = LEVEL_AT[lv] - LEVEL_AT[lv - 1];
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 24, y + 13, 48, 4);
+    ctx.fillStyle = '#69f0ae'; ctx.fillRect(x - 24, y + 13, 48 * Math.min(1, have / need), 4);
+  }
+}
+
 // ---- Lifetime stats for the stats page (saved on this computer) ----
 let life = { splats: 0, games: 0, seconds: 0, shots: {}, places: [], bosses: 0, coins: 0 }, showStats = false, lifeSaveTimer = 0;
 try { life = Object.assign(life, JSON.parse(localStorage.getItem('poopLife') || '{}')); } catch (e) {}
@@ -1655,6 +1684,7 @@ function drawPocket() {
   if (hat) emoji(hat.emoji, 0, -58 * u, 40 * u);       // your animal's hat (squishes along with it)
   ctx.restore();
   if (sq > 0) emoji('✊', pos.x + 55 * u, pos.y, 50 * u);             // your squeezing hand
+  drawLevelBadge(a, pos, u);                           // Lv 1-5 badge and progress next to your animal
   if (a.ammo === 0 && state === 'play') label('HUNGRY! Feed me →', Math.max(pos.x + 40, 110), top - 18, 20, '#ffe14d');
 
   // Food bowl
