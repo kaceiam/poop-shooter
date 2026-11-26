@@ -71,6 +71,9 @@ const PLACES = [
   { name: 'The Mall', icon: '🛍️', indoor: true, sky: ['#e8dcc8', '#f6efe4'], ground: '#dcdfe3', path: null,
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🛍️', '🛍️', '🛍️', '🥤', '🎁'],
     deco: [[0.5, 0.88, '⛲', 56], [0.08, 0.8, '🪴', 34], [0.92, 0.8, '🪴', 34]] },
+  { name: 'The Farm', icon: '🚜', sky: ['#81d4fa', '#fff9c4'], ground: '#9ccc65', path: '#bcaaa4',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🌽', '🥕', '🪣', '🧺', '🥚'],
+    deco: [[0.6, 0.9, '🌻', 34], [0.95, 0.88, '🌻', 30]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -426,6 +429,7 @@ const ACHIEVEMENTS = [
   { id: 'zoo',     icon: '🦁', name: 'Zoo trip',        how: 'Reach the zoo' },
   { id: 'carnival', icon: '🎪', name: 'Carnival fun',   how: 'Reach the carnival' },
   { id: 'mall',    icon: '🛍️', name: 'Shop till you drop', how: 'Reach the mall' },
+  { id: 'farm',    icon: '🚜', name: 'Down on the farm', how: 'Reach the farm' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -653,7 +657,7 @@ function finishTutorial() {
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
@@ -1002,6 +1006,31 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The Farm') {
+    const bh = Math.min(110, hz * 0.8), bw = Math.min(140, W * 0.22), bx = W * 0.06;
+    ctx.fillStyle = '#c62828'; ctx.fillRect(bx, hz - bh * 0.7, bw, bh * 0.7);                     // barn
+    ctx.fillStyle = '#8e0000';
+    ctx.beginPath(); ctx.moveTo(bx - 8, hz - bh * 0.7); ctx.lineTo(bx + bw / 2, hz - bh); ctx.lineTo(bx + bw + 8, hz - bh * 0.7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * 0.3, hz - bh * 0.42, bw * 0.4, bh * 0.42);      // barn door
+    ctx.strokeStyle = '#c62828'; ctx.lineWidth = 3; ctx.beginPath();
+    ctx.moveTo(bx + bw * 0.3, hz - bh * 0.42); ctx.lineTo(bx + bw * 0.7, hz);
+    ctx.moveTo(bx + bw * 0.7, hz - bh * 0.42); ctx.lineTo(bx + bw * 0.3, hz); ctx.stroke();
+    ctx.fillStyle = '#b0bec5'; ctx.fillRect(bx + bw + 14, hz - bh * 0.95, bw * 0.28, bh * 0.95);   // silo
+    ctx.beginPath(); ctx.arc(bx + bw + 14 + bw * 0.14, hz - bh * 0.95, bw * 0.14, Math.PI, 0); ctx.fill();
+    for (const [fx, e] of [[0.55, '🐄'], [0.68, '🐑'], [0.8, '🐓']]) emoji(e, fx * W, hz - 16, 34);   // farm animals
+    const tx = (performance.now() / 40) % (W + 200) - 100;                                         // tractor driving by
+    emoji('🚜', tx, hz - 14, 44, true);
+    ctx.fillStyle = '#8d6e63';                                                                     // fence
+    for (let x = 10; x < W; x += 40) ctx.fillRect(x, hz - 26, 6, 28);
+    ctx.fillRect(0, hz - 22, W, 4); ctx.fillRect(0, hz - 10, W, 4);
+    const top = pocketTop();
+    for (const [fx, fy] of [[0.25, 0.82], [0.8, 0.7]]) {                                           // hay bales
+      const x = fx * W, y = hz + fy * (top - hz);
+      ctx.fillStyle = '#f9d976'; ctx.beginPath(); ctx.roundRect(x - 28, y - 18, 56, 30, 6); ctx.fill();
+      ctx.strokeStyle = '#c9a43c'; ctx.lineWidth = 2;
+      for (const k of [-12, 0, 12]) { ctx.beginPath(); ctx.moveTo(x + k, y - 18); ctx.lineTo(x + k, y + 12); ctx.stroke(); }
+    }
+  }
   if (here.name === 'The Mall') {
     const top = pocketTop();
     ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 2;                       // floor tiles

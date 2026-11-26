@@ -12,7 +12,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 5. Each level gives you 40 seconds to reach a goal score. Make it and you go to the next level, where people walk faster and there are more of them. Runners 🏃 are worth 3, and hitting two people with one poop gives a bonus. Hit someone again within 2 seconds for a 🔥 combo: x2, then x3!
 6. Watch out for sneaky people! They hop out of the way of small poops (bird, dog), but they can't escape the big splats (cow, elephant). They're worth 2, and there are more of them every level.
    People with umbrellas ☂️ block your first poop, and skaters 🛹 zoom by fast (worth 3).
-7. Every 2 levels you go somewhere new: 🌳 the park, then 🏖️ the beach, then 🏫 the school, then 🦁 the zoo, then 🎪 the carnival, then 🛍️ the mall, and then around again.
+7. Every 2 levels you go somewhere new: 🌳 the park, then 🏖️ the beach, then 🏫 the school, then 🦁 the zoo, then 🎪 the carnival, then 🛍️ the mall, then 🚜 the farm, and then around again.
 8. On levels 3, 6, 9 and so on, a giant boss 👑 walks by. Hit him 3 times for 10 points!
 9. Power-ups float down from the sky. Tap one to grab it: ⭐ double points, 💥 super poop (giant splats), or 🍱 full tummies (every animal reloaded).
 10. Earn 🏆 achievements, like beating a boss or reaching the zoo. Tap the trophy line on the start screen (or press A) to see them.
