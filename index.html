@@ -30,10 +30,10 @@ const ANIMALS = [
   { name: 'Cow',      emoji: '🐮', food: '🌿', foodName: 'grass',   maxAmmo: 3, perFood: 1, splat: 65, speed: 0.9 },
   { name: 'Elephant', emoji: '🐘', food: '🥜', foodName: 'peanuts', maxAmmo: 2, perFood: 1, splat: 95, speed: 0.7 },
   // Special animals: the monkey throws 3 at once, the unicorn's magic poop follows a person.
-  { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3 },
-  { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true },
+  { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3, price: 40 },
+  { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true, price: 150 },
   // The skunk's poop leaves a stink cloud that splats anyone who walks into it.
-  { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true },
+  { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true, price: 80 },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
@@ -142,7 +142,28 @@ function toggleMute() {
   muted = !muted;
   try { localStorage.setItem('poopMute', muted ? '1' : '0'); } catch (e) {}
 }
-function selectAnimal(i) { if (i !== current) { current = i; sfx('switch'); } }
+// ---- Animal shop: your points become coins after each game. Special animals cost coins. ----
+let coins = 0, owned = new Set(), showShop = false, shopMsg = '', shopRows = [];
+try {
+  coins = +localStorage.getItem('poopCoins') || 0;
+  owned = new Set(JSON.parse(localStorage.getItem('poopOwned') || '[]'));
+} catch (e) {}
+const isOwned = a => !a.price || owned.has(a.name);
+function saveShop() {
+  try { localStorage.setItem('poopCoins', coins); localStorage.setItem('poopOwned', JSON.stringify([...owned])); } catch (e) {}
+}
+function buy(a) {
+  if (isOwned(a)) return;
+  if (coins < a.price) { shopMsg = `You need ${a.price - coins} more coins for the ${a.name}!`; sfx('empty'); return; }
+  coins -= a.price; owned.add(a.name); saveShop();
+  shopMsg = `You got the ${a.name}! ${a.emoji}`;
+  sfx('power');
+}
+
+function selectAnimal(i) {
+  if (!isOwned(ANIMALS[i])) { addText(W / 2, pocketTop() - 40, `🔒 Get the ${ANIMALS[i].name} in the shop!`, '#ffe14d'); sfx('empty'); return; }
+  if (i !== current) { current = i; sfx('switch'); }
+}
 const muteBtn = () => ({ x: W - 44, y: 30 });
 const pauseBtn = () => ({ x: W - 44, y: 74 });
 let paused = false;
@@ -415,8 +436,16 @@ canvas.addEventListener('pointerdown', e => {
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   if (state === 'title' || state === 'over') {
+    if (showShop) {                                   // tap an animal to buy it, anywhere else to go back
+      const row = shopRows.find(r => p.y > r.y - r.h / 2 && p.y < r.y + r.h / 2);
+      if (row && !isOwned(row.a)) buy(row.a); else { showShop = false; shopMsg = ''; }
+      return;
+    }
     if (showTrophies) { showTrophies = false; return; }
-    if (Math.abs(p.y - trophyLineY()) < 22) { showTrophies = true; return; }
+    if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop on the left, achievements on the right
+      if (p.x < W / 2) showShop = true; else showTrophies = true;
+      return;
+    }
     startGame(); return;
   }
   if (state !== 'play') return;                       // no shooting during the level banner
@@ -452,8 +481,11 @@ addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') toggleMute();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
   const onMenu = state === 'title' || state === 'over';
-  if ((e.key === 'a' || e.key === 'A') && onMenu) showTrophies = !showTrophies;
-  if ((e.key === ' ' || e.key === 'Enter') && onMenu) { if (showTrophies) showTrophies = false; else startGame(); }
+  if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop) showTrophies = !showTrophies;
+  if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies) { showShop = !showShop; shopMsg = ''; }
+  if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
+    if (showTrophies || showShop) { showTrophies = false; showShop = false; } else startGame();
+  }
 });
 
 function startGame() {
@@ -561,6 +593,7 @@ function update(dt) {
     timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
     newBest = score > best && score > 0;
     sfx(newBest ? 'level' : 'end');                     // happy tune for a new best, sad tune otherwise
+    coins += score; saveShop();                        // points become coins for the shop
     if (score > best) { best = score; try { localStorage.setItem('poopBest', best); } catch (e) {} }
     if (level > bestLevel) { bestLevel = level; try { localStorage.setItem('poopBestLevel', bestLevel); } catch (e) {} }
   }
@@ -667,6 +700,27 @@ function drawHud() {
 }
 
 const trophyLineY = () => H - 28;
+function drawShop() {
+  ctx.fillStyle = '#10202a'; ctx.fillRect(0, 0, W, H);
+  label('🛒 Animal Shop', W / 2, 44, Math.min(34, W / 12), '#9ff');
+  label(`You have 🪙 ${coins} coins`, W / 2, 82, Math.min(20, W / 20), '#ffe14d');
+  const list = ANIMALS.filter(a => a.price);
+  const rowH = Math.min(70, (H - 200) / list.length), fs = Math.min(20, W / 20), left = Math.max(16, W / 2 - 200);
+  shopRows = [];
+  list.forEach((a, i) => {
+    const y = 130 + i * rowH + rowH / 2, have = isOwned(a), afford = coins >= a.price;
+    shopRows.push({ a, y, h: rowH });
+    ctx.fillStyle = have ? 'rgba(105,240,174,0.15)' : 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.roundRect(left - 8, y - rowH / 2 + 4, Math.min(W - 16, 416), rowH - 8, 12); ctx.fill();
+    emoji(a.emoji, left + 24, y, Math.min(44, rowH * 0.7));
+    label(a.name, left + 60, y - fs * 0.45, fs, '#fff', true, 'left');
+    label(a.spread ? 'Throws 3 poops at once' : a.homing ? 'Magic poop follows people' : 'Stink cloud splats walkers',
+      left + 60, y + fs * 0.6, fs * 0.7, '#ccc', false, 'left');
+    label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
+  });
+  if (shopMsg) para(shopMsg, W / 2, H - 70, Math.min(18, W / 22), '#ffe14d', W - 32);
+  label('Tap an animal to buy it · tap anywhere else to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
+}
 function drawTrophies() {
   ctx.fillStyle = '#1e1205'; ctx.fillRect(0, 0, W, H);
   const rowH = Math.min(52, (H - 140) / ACHIEVEMENTS.length), fs = Math.min(18, W / 24);
@@ -804,7 +858,11 @@ function drawPocket() {
   buttonRects().forEach((r, i) => {
     ctx.fillStyle = i === current ? '#ffe14d' : 'rgba(255,255,255,0.25)';
     ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
+    const locked = !isOwned(ANIMALS[i]);
+    if (locked) ctx.globalAlpha = 0.35;
     emoji(ANIMALS[i].emoji, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.62);
+    ctx.globalAlpha = 1;
+    if (locked) emoji('🔒', r.x + r.w - 10, r.y + r.h - 10, r.w * 0.32);
     label(String(i + 1), r.x + 9, r.y + 10, 12, '#fff', false);
   });
 }
@@ -910,7 +968,7 @@ function draw() {
       const ts = short ? Math.min(20, W / 22) : Math.min(26, W / 18), ss = short ? Math.min(s, H / 8) : s;
       let y = short ? H * 0.2 : H * 0.28;
       label("TIME'S UP!", W / 2, y, ss, '#ffe14d');
-      y = para(`You made it to Level ${level} and pooped on people for ${score} points`, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
+      y = para(`You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
       if (newBest) {
         const pulse = 1 + Math.sin(performance.now() / 150) * 0.06;
         label('🎉 NEW BEST! 🎉', W / 2, y + ts * 0.4, ts * 1.2 * pulse, '#ffe14d');
@@ -919,8 +977,11 @@ function draw() {
       }
       label('Click to play again', W / 2, Math.min(y + ts * 2.6, trophyLineY() - 40), Math.min(32, W / 16), '#ff7ad9');
     }
-    label(`🏆 Achievements: ${unlocked.size}/${ACHIEVEMENTS.length}  (tap here to see)`, W / 2, trophyLineY(), Math.min(18, W / 22), '#ffe14d');
+    const fs = Math.min(18, W / 22);
+    label(`🛒 Shop · 🪙 ${coins}`, W * 0.27, trophyLineY(), fs, '#9ff');
+    label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 0.73, trophyLineY(), fs, '#ffe14d');
     if (showTrophies) drawTrophies();
+    if (showShop) drawShop();
   }
   if (toast && state !== 'title') {                    // achievement pop-up
     ctx.globalAlpha = Math.min(1, toast.time * 2);
