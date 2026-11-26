@@ -255,7 +255,7 @@ const muteBtn = () => ({ x: W - 44, y: 30 });
 
 // ---- Party mode (looks only): silly hats on people and confetti on big moments ----
 // A menu (shop, help, achievements, what's new) covers the screen: hide the party button so it can't get in the way.
-const menuOpen = () => (state === 'title' || state === 'over') && (showShop || showTrophies || helpPage || showNews || showStats);
+const menuOpen = () => (state === 'title' || state === 'over') && (showShop || showTrophies || helpPage || showNews || showStats || showPicker);
 const partyBtn = () => W < 600 ? { x: W - 44, y: 118 } : { x: W - 90, y: 30 };   // under the pause button on phones
 const HATS = ['🎩', '👒', '🧢', '🎓'];
 const CONFETTI_COLORS = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff9100'];
@@ -881,6 +881,12 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (showNews) { closeNews(); return; }
     if (showTrophies) { showTrophies = false; return; }
+    if (showPicker) {                                  // free play: tap a place you've reached, anywhere else goes back
+      const cell = pickerCells.find(c => c.open && p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.h);
+      showPicker = false;
+      if (cell) startFree(cell.i);
+      return;
+    }
     if (showStats) { showStats = showStats === 1 ? 2 : 0; return; }   // stats, then the calendar, then close
     if (helpPage) { helpPage = helpPage < HELP_PAGES.length ? helpPage + 1 : 0; return; }   // tap for the next page
     if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop | help | achievements
@@ -889,7 +895,7 @@ canvas.addEventListener('pointerdown', e => {
       return;
     }
     const mb = modeButtons().find(b => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h);
-    if (mb) { ({ rush: startRush, zen: startZen, duo: startDuo })[mb.id](); return; }   // Boss Rush, Zen or 2 Players
+    if (mb) { ({ rush: startRush, zen: startZen, duo: startDuo, free: () => { showPicker = true; } })[mb.id](); return; }   // Boss Rush, Zen or 2 Players
     playAgain();
     return;
   }
@@ -939,10 +945,11 @@ addEventListener('keydown', e => {
   if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
   if ((e.key === 'z' || e.key === 'Z') && onMenu && !menuOpen()) startZen();
   if ((e.key === 't' || e.key === 'T') && onMenu && !menuOpen()) startDuo();
+  if ((e.key === 'f' || e.key === 'F') && onMenu && !menuOpen()) showPicker = true;
   if ((e.key === ' ' || e.key === 'Enter') && state === 'duoReady') { beginDuoTurn(); return; }
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showNews) closeNews();
-    else if (showTrophies || showShop || helpPage || showStats) { showTrophies = false; showShop = false; helpPage = 0; showStats = false; } else playAgain();
+    else if (showTrophies || showShop || helpPage || showStats || showPicker) { showTrophies = false; showShop = false; helpPage = 0; showStats = false; showPicker = false; } else playAgain();
   }
 });
 
@@ -971,8 +978,10 @@ const modeButtons = () => {
     { id: 'rush', text: '👑 Boss Rush', color: 'rgba(255,122,217,0.9)', w: 168 },
     { id: 'zen',  text: '🧘 Zen',       color: 'rgba(79,195,247,0.9)',  w: 104 },
     { id: 'duo',  text: '👥 2 Players', color: 'rgba(255,167,38,0.95)', w: 150 },
+    { id: 'free', text: '🗺️ Free play', color: 'rgba(102,187,106,0.95)', w: 150 },
   ];
   let x = 12, y = 12;
+  if (W < 600) [146, 96, 138, 132].forEach((w, i) => list[i].w = w);   // a bit narrower on phones so they fit in two rows
   for (const b of list) {
     if (W < 600 && x + b.w > W - 70) { x = 12; y += 48; }   // wrap to a second row on narrow screens
     Object.assign(b, { x, y, h: 40 }); x += b.w + 8;
@@ -1015,8 +1024,41 @@ function beginDuoTurn() {
   startGame();
   mode = 'duo'; tut = 0; timeLeft = DUO_TIME;
 }
+// ---- Free play: pick any place you've reached and play a 60-second round there ----
+// No level goal, coins at half rate, bests don't change.
+const FREE_TIME = 60;
+let showPicker = false, pickerCells = [], freeIdx = 0;
+const placeReached = i => i === 0 || life.places.includes(PLACES[i].name);
+function startFree(i) {
+  startGame();
+  mode = 'free'; tut = 0; freeIdx = i;
+  level = i * 2 + 1; startLevel();                     // the people move like they do in that place
+  timeLeft = FREE_TIME;
+  addText(W / 2, horizon() + 60, `🗺️ Free play at ${PLACES[i].name}!`, '#a5d6a7');
+}
+function drawPicker() {
+  ctx.fillStyle = '#16301a'; ctx.fillRect(0, 0, W, H);
+  label('🗺️ Free play: pick a place', W / 2, 40, Math.min(28, W / 14), '#a5d6a7', true, 'center', W - 24);
+  label('60 seconds, no level goal · coins at half rate', W / 2, 72, Math.min(15, W / 26), '#fff', true, 'center', W - 24);
+  const cols = Math.max(3, Math.min(7, Math.floor((W - 24) / 110))), rows = Math.ceil(PLACES.length / cols);
+  const cw = Math.min(120, (W - 24) / cols), ch = Math.min(96, (H - 150) / rows), x0 = W / 2 - (cols * cw) / 2;
+  pickerCells = [];
+  PLACES.forEach((pl, i) => {
+    const x = x0 + (i % cols) * cw, y = 96 + Math.floor(i / cols) * ch, open = placeReached(i);
+    pickerCells.push({ i, x, y, w: cw, h: ch, open });
+    ctx.globalAlpha = open ? 1 : 0.4;
+    ctx.fillStyle = open ? 'rgba(165,214,167,0.18)' : 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.roundRect(x + 4, y + 4, cw - 8, ch - 8, 12); ctx.fill();
+    emoji(open ? pl.icon : '🔒', x + cw / 2, y + ch * 0.4, Math.min(36, ch * 0.42));
+    label(pl.name.replace('The ', ''), x + cw / 2, y + ch * 0.78, Math.min(14, ch * 0.17), '#fff', true, 'center', cw - 10);
+    ctx.globalAlpha = 1;
+  });
+  label('Places unlock when you reach them in a normal game · tap anywhere else to go back', W / 2, H - 24, Math.min(13, W / 34), '#ff7ad9', true, 'center', W - 16);
+}
+
 function playAgain() {                                 // "play again" keeps the same mode
   if (state === 'over' && mode === 'rush') startRush();
+  else if (state === 'over' && mode === 'free') startFree(freeIdx);
   else if (state === 'over' && mode === 'duo') startDuo();
   else startGame();
 }
@@ -1070,7 +1112,7 @@ function startLevel() {
   reactTimer = 5;
   const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city', 'The Jungle': 'jungle', 'The Desert': 'desert', 'The Harbor': 'harbor' }[place().name];
   if (placeId) unlock(placeId);
-  dailyEvent('level', level);
+  if (mode === 'normal') dailyEvent('level', level);   // free play can't skip ahead for the challenge
   people = []; poops = []; splats = []; texts = [];
   ANIMALS.forEach(a => a.ammo = a.maxAmmo);
   for (let i = 0; i < 3; i++) { spawnPerson(); people[people.length - 1].x = Math.random() * W; }
@@ -1156,8 +1198,10 @@ function update(dt) {
       if (duo.turn === 1) { duo.turn = 2; state = 'duoReady'; sfx('level'); } else { newBest = false; sfx('level'); }
       return;
     }
-    coins += score; saveShop();                        // points become coins for the shop
-    life.coins += score; saveLife();
+    const earned = mode === 'free' ? Math.floor(score / 2) : score;   // free play earns coins at half rate
+    coins += earned; saveShop();                       // points become coins for the shop
+    life.coins += earned; saveLife();
+    if (mode === 'free') { newBest = false; sfx('end'); return; }   // free play doesn't change your bests
     if (mode === 'rush') {                             // boss rush keeps its own best
       newBest = rushBeaten > rushBest;
       if (newBest) { rushBest = rushBeaten; try { localStorage.setItem('poopRushBest', rushBest); } catch (e) {} }
@@ -1207,7 +1251,7 @@ function update(dt) {
   poops = poops.filter(p => p.t < p.dur);
   updateClouds(dt);
   updateStorms(dt);
-  if (state === 'play' && !tut && mode !== 'rush' && mode !== 'duo' && levelScore >= goal()) levelUp();
+  if (state === 'play' && !tut && mode !== 'rush' && mode !== 'duo' && mode !== 'free' && levelScore >= goal()) levelUp();
   for (const s of splats) {
     s.life -= dt;
     if (s.vx > 5) rollSplat(s, dt);                  // rolling down the mountain
@@ -1290,6 +1334,7 @@ function drawHud() {
   if (mode === 'zen') label('🧘 Zen', hudX, 30, 26, '#9ff');
   else label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
   if (mode === 'zen') label(`Splats: ${zenSplats}`, hudX, 62, 18, '#9ff');
+  else if (mode === 'free') label(`🗺️ Free play`, hudX, 62, 18, '#a5d6a7');
   else if (mode === 'duo') label(`👤 ${pName(duo.turn)}`, hudX, 62, 18, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
   else if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
   else label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
@@ -1647,10 +1692,13 @@ function draw() {
       label(two ? winner : rush ? 'BOSS RUSH OVER!' : "TIME'S UP!", W / 2, y, ss, '#ffe14d', true, 'center', W - 24);
       const said = two ? `👤 ${pName(1)}: ${s1} points   ·   👤 ${pName(2)}: ${s2} points`
         : rush ? `You beat ${rushBeaten} giant boss${rushBeaten === 1 ? '' : 'es'}! (+${score} 🪙)`
+        : mode === 'free' ? `Free play at ${place().name}: ${score} points (+${Math.floor(score / 2)} 🪙)`
         : `You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`;
       y = para(said, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
       if (two) {
         label('Want a rematch?', W / 2, y + ts * 0.4, ts, '#fff');
+      } else if (mode === 'free') {
+        label('Play again here, or pick another place with 🗺️ Free play', W / 2, y + ts * 0.4, Math.min(ts, 18), '#fff', true, 'center', W - 24);
       } else if (newBest) {
         const pulse = 1 + Math.sin(performance.now() / 150) * 0.06;
         label('🎉 NEW BEST! 🎉', W / 2, y + ts * 0.4, ts * 1.2 * pulse, '#ffe14d');
@@ -1672,6 +1720,7 @@ function draw() {
     label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 7 / 8, trophyLineY(), fs, '#ffe14d', true, 'center', W / 4 - 6);
     if (helpPage) drawHelp();
     if (showStats === 1) drawStats(); else if (showStats === 2) drawCalendar();
+    if (showPicker) drawPicker();
     if (showNews && state === 'title') drawList("✨ What's new!", NEWS, 'Tap anywhere to close', '#1a1030');
     if (showTrophies) drawTrophies();
     if (showShop) drawShop();
