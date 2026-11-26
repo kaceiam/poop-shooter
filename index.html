@@ -32,7 +32,21 @@ const ANIMALS = [
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
-const PEOPLE = ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'];   // full-body people only
+// ---- Places: the place changes every 2 levels ----
+// people: full-body emoji only. props: things they carry (only some people carry one).
+// deco: things on the ground as [across 0-1, down 0-1, emoji, size].
+const PLACES = [
+  { name: 'The Park', icon: '🌳', sky: ['#6ec6ff', '#bfe8ff'], ground: '#7cc95a', path: '#d9c08a',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['🎈', '🐕', '☕'],
+    deco: [[0.08, 0.85, '🌷', 30], [0.9, 0.15, '🌼', 26], [0.6, 0.9, '🌷', 28]] },
+  { name: 'The Beach', icon: '🏖️', sky: ['#4fc3f7', '#e1f5fe'], ground: '#f4dca0', path: null,
+    people: ['🚶', '🚶‍♀️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🏄', '🏄‍♀️', '🤸', '🤸‍♀️'], props: ['🍦', '🏐', '🛟', '🍉'],
+    deco: [[0.06, 0.2, '🌴', 70], [0.94, 0.25, '🌴', 70], [0.3, 0.75, '⛱️', 50], [0.75, 0.85, '🏰', 40], [0.5, 0.15, '🐚', 24]] },
+  { name: 'The School', icon: '🏫', sky: ['#90caf9', '#e3f2fd'], ground: '#a7adb3', path: '#f2c14e',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🎒', '🎒', '🎒', '📚', '🍎'],
+    deco: [[0.12, 0.8, '⚽', 26], [0.85, 0.7, '🏀', 26]] },
+];
+const place = () => PLACES[Math.floor((level - 1) / 2) % PLACES.length];
 const YUCKS = ['EWW!', 'GROSS!', 'NOOO!', 'MY SHIRT!', 'YUCK!', 'WHY?!', 'EW EW EW'];
 // ---- Levels: reach the goal before time runs out to go to the next level ----
 const LEVEL_TIME = 40;
@@ -129,11 +143,13 @@ function spawnPerson() {
   const y = horizon() + 30 + depth * (pocketTop() - horizon() - 70);
   const scale = (0.55 + depth * 0.8) * Math.max(ui(), 0.75);
   const dir = Math.random() < 0.5 ? 1 : -1;
-  const emoji = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
+  const here = place();
+  const emoji = here.people[Math.floor(Math.random() * here.people.length)];
+  const prop = Math.random() < 0.6 ? here.props[Math.floor(Math.random() * here.props.length)] : null;
   const runner = emoji.startsWith('🏃');
   const dodger = !runner && Math.random() < dodgeChance();
   people.push({
-    x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji,
+    x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji, prop,
     speed: (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5) * speedBoost(),
     points: runner ? 3 : dodger ? 2 : 1, hit: false, bob: Math.random() * 6,
     dodger, dodgeTime: 0, dodgeDir: 1, dodgeSpeed: 0, pause: 0, cool: 0,
@@ -342,16 +358,40 @@ function para(msg, x, y, size, color, maxW) {
   return y + lines.length * size * 1.3;
 }
 
-function drawPark() {
-  const sky = ctx.createLinearGradient(0, 0, 0, horizon());
-  sky.addColorStop(0, '#6ec6ff'); sky.addColorStop(1, '#bfe8ff');
-  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, horizon());
+function drawPlace() {
+  const here = place(), hz = horizon(), top = pocketTop();
+  const sky = ctx.createLinearGradient(0, 0, 0, hz);
+  sky.addColorStop(0, here.sky[0]); sky.addColorStop(1, here.sky[1]);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz);
   emoji('☀️', W * 0.8, 92, 50);
   emoji('☁️', W * 0.25, 50, 50); emoji('☁️', W * 0.6, 80, 40);
-  ctx.fillStyle = '#7cc95a'; ctx.fillRect(0, horizon(), W, H);
-  for (let i = 0; i < 7; i++) emoji('🌳', (i + 0.5) * W / 7, horizon() - 10, 55);
-  ctx.fillStyle = '#d9c08a';                          // a path through the park
-  ctx.fillRect(0, horizon() + (pocketTop() - horizon()) * 0.45, W, 26);
+  ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
+
+  if (here.name === 'The Park') {
+    for (let i = 0; i < 7; i++) emoji('🌳', (i + 0.5) * W / 7, hz - 10, 55);
+  } else if (here.name === 'The Beach') {
+    ctx.fillStyle = '#2b9be0'; ctx.fillRect(0, hz - 45, W, 55);                 // the sea
+    ctx.fillStyle = '#7fd0ff'; ctx.fillRect(0, hz - 45, W, 6);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath();            // waves on the sand
+    for (let x = 0; x <= W; x += 20) ctx.lineTo(x, hz + 10 + Math.sin(x / 30 + performance.now() / 600) * 3);
+    ctx.stroke();
+    emoji('⛵', W * 0.35, hz - 30, 34); emoji('🐬', W * 0.68, hz - 22, 26);
+  } else if (here.name === 'The School') {
+    const bh = Math.min(95, hz * 0.65);                                         // shorter on small screens
+    ctx.fillStyle = '#c0564b'; ctx.fillRect(0, hz - bh, W, bh);                 // brick building
+    ctx.fillStyle = '#9e3f36'; ctx.fillRect(0, hz - bh - 5, W, 8);
+    ctx.fillStyle = '#bfe3ff';
+    for (let x = 30; x < W - 40; x += 70) {
+      if (Math.abs(x + 15 - W / 2) < 50) continue;                            // leave room for the door
+      ctx.fillRect(x, hz - bh * 0.84, 30, bh * 0.25); ctx.fillRect(x, hz - bh * 0.47, 30, bh * 0.25);
+    }
+    ctx.fillStyle = '#6d4c41'; ctx.fillRect(W / 2 - 25, hz - bh * 0.58, 50, bh * 0.58);   // door
+  }
+  if (here.path) {
+    ctx.fillStyle = here.path;
+    ctx.fillRect(0, hz + (top - hz) * 0.45, W, here.name === 'The School' ? 8 : 26);
+  }
+  for (const [fx, fy, e, size] of here.deco) emoji(e, fx * W, hz + fy * (top - hz), size);
 }
 
 function drawPocket() {
@@ -399,7 +439,7 @@ function drawPoopFlying(p) {
 }
 
 function draw() {
-  drawPark();
+  drawPlace();
   for (const s of splats) {
     ctx.globalAlpha = Math.min(1, s.life);
     ctx.fillStyle = '#6b3e13';
@@ -411,6 +451,7 @@ function draw() {
     const size = 70 * p.scale;
     const bob = Math.abs(Math.sin(p.bob)) * 4 * p.scale;
     emoji(p.emoji, p.x, p.y - size * 0.45 - bob, size, p.dir === 1);   // emoji face left, so flip
+    if (p.prop) emoji(p.prop, p.x + p.dir * size * 0.28, p.y - size * 0.35 - bob, size * 0.38);   // what they carry
     if (p.hit) emoji('💩', p.x, p.y - size * 0.95 - bob, size * 0.45);   // poop on their head!
   }
   for (const p of poops) drawPoopFlying(p);
@@ -434,9 +475,11 @@ function draw() {
     const pop = Math.min(1, (2.2 - bannerTime) * 5);                   // grows in quickly
     const bs = Math.min(70, W / 7) * (0.5 + pop * 0.5);
     const by = Math.max(H * 0.32, 85 + Math.min(70, W / 7) / 2);    // stay below the score bar
+    const step = Math.min(22, W / 20) * 1.5, line1 = by + Math.min(70, W / 7) * 0.85;
     label(`Level ${level}!`, W / 2, by, bs, '#ffe14d');
-    label('Faster people, and more of them!', W / 2, by + Math.min(70, W / 7), Math.min(22, W / 20), '#fff');
-    label(`Goal: ${goal()} points`, W / 2, by + Math.min(70, W / 7) + 34, Math.min(22, W / 20), '#fff');
+    label(`${place().icon} ${place().name} ${place().icon}`, W / 2, line1, Math.min(28, W / 15), '#9ff');
+    label('Faster people, and more of them!', W / 2, line1 + step * 1.1, Math.min(22, W / 20), '#fff');
+    label(`Goal: ${goal()} points`, W / 2, line1 + step * 2.1, Math.min(22, W / 20), '#fff');
   }
   if (state === 'title' || state === 'over') {
     ctx.fillStyle = 'rgba(40,20,5,0.7)'; ctx.fillRect(0, 0, W, H);
