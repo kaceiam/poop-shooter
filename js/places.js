@@ -367,3 +367,23 @@ function citySkyline(hz) {
   }
   return skyline;
 }
+
+// Each place has its own giant boss (same rules everywhere: 3 hits, 10 points).
+// [emoji, name, what it wears on its head]
+const BOSSES = {
+  'The Park':     ['🚶‍♂️', 'Giant Gary', '👑'],
+  'The Beach':    ['🏄‍♂️', 'Surf King', '👑'],
+  'The School':   ['🚶‍♂️', 'The Principal', '🎓'],
+  'The Zoo':      ['🦍', 'Giant Gorilla', '👑'],
+  'The Carnival': ['🤹', 'The Great Juggler', '🎩'],
+  'The Mall':     ['🚶‍♀️', 'Mega Shopper', '👒'],
+  'The Farm':     ['🐄', 'Big Bessie', '👑'],
+  'The Moon':     ['🛸', 'Alien Mothership', '👑'],
+  'The Reef':     ['🦈', 'Mega Shark', '👑'],
+  'The Mountain': ['☃️', 'Giant Snowman', '🎩'],
+  'The City':     ['🕺', 'Disco King', '👑'],
+  'The Jungle':   ['🐊', 'Croc Boss', '👑'],
+  'The Desert':   ['🦂', 'Giant Scorpion', '👑'],
+  'The Harbor':   ['🦑', 'The Kraken', '🏴‍☠️'],
+};
+const bossLook = () => BOSSES[place().name] || ['🚶‍♂️', 'Giant boss', '👑'];

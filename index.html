@@ -361,12 +361,12 @@ function spawnBoss() {
   const dir = Math.random() < 0.5 ? 1 : -1;
   people.push({
     x: dir === 1 ? -100 : W + 100, y: horizon() + (pocketTop() - horizon()) * 0.88,
-    scale: 2.5 * Math.max(ui(), 0.75), dir, emoji: '🚶‍♂️', prop: null,
+    scale: 2.5 * Math.max(ui(), 0.75), dir, emoji: bossLook()[0], bossName: bossLook()[1], crown: bossLook()[2], prop: null,   // each place has its own boss
     speed: 45 * speedBoost(), points: 10, hit: false, bob: 0,
     boss: true, hp: 3, flash: 0, dodger: false, dodgeTime: 0, pause: 0, cool: 0,
   });
   people.sort((a, b) => a.y - b.y);
-  addText(W / 2, horizon() + 40, '⚠️ GIANT BOSS! Hit him 3 times!', '#ff7ad9');
+  addText(W / 2, horizon() + 40, `⚠️ ${bossLook()[1]}! Hit 3 times!`, '#ff7ad9');
   sfx('boss');
 }
 
@@ -501,7 +501,7 @@ function strike(person, countsForStreak, x, y, fromCloud) {
     addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
     return true;
   }
-  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss');
+  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, `${person.bossName || 'BOSS'} DOWN! 🎉`, '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss');
     if (mode === 'rush') { rushBeaten++; level++; }   // boss rush: the next boss is faster (and somewhere new)
     life.bosses++;
   }
@@ -1551,7 +1551,7 @@ function draw() {
       const head = p.y - size * 0.95 - bob;
       for (let i = 0; i < 3 - p.hp; i++) emoji('💩', p.x, head - i * size * 0.14, size * 0.26);   // poop pile on his head
       if (!p.hit) {
-        emoji('👑', p.x, head - (3 - p.hp) * size * 0.14 - size * 0.08, size * 0.3);
+        emoji(p.crown || '👑', p.x, head - (3 - p.hp) * size * 0.14 - size * 0.08, size * 0.3);
         for (let i = 0; i < p.hp; i++) emoji('❤️', p.x + (i - (p.hp - 1) / 2) * 20, head - size * 0.3 - (3 - p.hp) * size * 0.14, 18);
       }
       continue;
@@ -1608,7 +1608,7 @@ function draw() {
     const step = Math.min(22, W / 20) * 1.5, line1 = by + Math.min(70, W / 7) * 0.85;
     label(`Level ${level}!`, W / 2, by, bs, '#ffe14d');
     label(`${place().icon} ${place().name} ${place().icon}`, W / 2, line1, Math.min(28, W / 15), '#9ff');
-    label(isBossLevel() ? '⚠️ A giant boss is coming!' : 'Faster people, and more of them!', W / 2, line1 + step * 1.1, Math.min(22, W / 20), '#fff');
+    label(isBossLevel() ? `⚠️ ${bossLook()[1]} is coming!` : 'Faster people, and more of them!', W / 2, line1 + step * 1.1, Math.min(22, W / 20), '#fff');
     label(`Goal: ${goal()} points`, W / 2, line1 + step * 2.1, Math.min(22, W / 20), '#fff');
   }
   if (state === 'title' || state === 'over') {
