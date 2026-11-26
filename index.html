@@ -173,6 +173,37 @@ function selectAnimal(i) {
   if (i !== current) { current = i; sfx('switch'); }
 }
 const muteBtn = () => ({ x: W - 44, y: 30 });
+
+// ---- Party mode (looks only): silly hats on people and confetti on big moments ----
+const partyBtn = () => W < 600 ? { x: W - 44, y: 118 } : { x: W - 90, y: 30 };   // under the pause button on phones
+const HATS = ['🎩', '👒', '🧢', '🎓'];
+const CONFETTI_COLORS = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff9100'];
+let party = false, confetti = [];
+try { party = localStorage.getItem('poopParty') === '1'; } catch (e) {}
+function toggleParty() {
+  party = !party;
+  try { localStorage.setItem('poopParty', party ? '1' : '0'); } catch (e) {}
+  if (party) burst(W / 2, H * 0.3, 40);
+}
+function burst(x, y, count) {
+  if (!party) return;
+  for (let i = 0; i < count && confetti.length < 250; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 120 + Math.random() * 260;
+    confetti.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, rot: Math.random() * 6, life: 1.6 + Math.random(),
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)] });
+  }
+}
+function updateConfetti(dt) {
+  for (const c of confetti) { c.vy += 500 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vx *= 0.99; c.rot += dt * 8; c.life -= dt; }
+  confetti = confetti.filter(c => c.life > 0 && c.y < H + 20);
+}
+function drawConfetti() {
+  for (const c of confetti) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot);
+    ctx.globalAlpha = Math.min(1, c.life); ctx.fillStyle = c.color; ctx.fillRect(-4, -2, 8, 4);
+    ctx.restore();
+  }
+}
 const pauseBtn = () => ({ x: W - 44, y: 74 });
 let paused = false;
 const canPause = () => state === 'play' || state === 'banner';
@@ -225,6 +256,7 @@ function spawnPerson() {
   people.push({
     x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji: skater ? '🧍' : emoji, prop: umbrella || skater ? null : prop,
     speed, points: runner || skater ? 3 : dodger || umbrella ? 2 : 1, hit: false, bob: Math.random() * 6,
+    hat: HATS[Math.floor(Math.random() * HATS.length)],
     dodger, umbrella, hadUmbrella: umbrella, skater, dodgeTime: 0, dodgeDir: 1, dodgeSpeed: 0, pause: 0, cool: 0,
   });
   people.sort((a, b) => a.y - b.y);                  // far people drawn first
@@ -320,7 +352,7 @@ function strike(person, countsForStreak, x, y, fromCloud) {
     addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
     return true;
   }
-  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); dailyEvent('boss'); }
+  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss'); }
   if (person.dodger) { countStat('dodgers', 5, 'dodger5'); dailyEvent('dodgers'); }
   if (person.skater) dailyEvent('skaters');
   if (person.hadUmbrella) dailyEvent('umbrellas');
@@ -434,6 +466,7 @@ function bumpStreak(x, y) {
   streakTimer = STREAK_TIME;
   if (streak >= 2) {
     addText(x, y - 80, `COMBO x${Math.min(3, streak)}!`, '#ff7ad9');
+    if (streak >= 3) burst(x, y - 40, 25);
     sfx('combo');
   }
   if (streak >= 3) { unlock('combo3'); dailyEvent('combo'); }
@@ -501,6 +534,8 @@ canvas.addEventListener('pointerdown', e => {
   const p = pointer(e);
   const m = muteBtn();
   if (Math.hypot(p.x - m.x, p.y - m.y) < 26) { toggleMute(); return; }
+  const pt = partyBtn();
+  if (Math.hypot(p.x - pt.x, p.y - pt.y) < 22) { toggleParty(); return; }
   if (paused) { setPaused(false); return; }           // any click un-pauses
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
@@ -548,6 +583,7 @@ addEventListener('keydown', e => {
   const n = parseInt(e.key);
   if (n >= 1 && n <= ANIMALS.length) selectAnimal(n - 1);
   if (e.key === 'm' || e.key === 'M') toggleMute();
+  if (e.key === 'h' || e.key === 'H') toggleParty();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
   const onMenu = state === 'title' || state === 'over';
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop) showTrophies = !showTrophies;
@@ -591,6 +627,7 @@ function startLevel() {
   for (let i = 0; i < 3; i++) { spawnPerson(); people[people.length - 1].x = Math.random() * W; }
 }
 function levelUp() {
+  burst(W / 2, H * 0.3, 50);
   level++; levelScore = 0;
   state = 'banner'; bannerTime = 2.2;
   poops = []; drag = null;
@@ -643,6 +680,7 @@ function update(dt) {
   chew = Math.max(0, chew - dt);
   hungryShake = Math.max(0, hungryShake - dt);
   if (toast && (toast.time -= dt) <= 0) toast = null;
+  updateConfetti(dt);
   for (const t of texts) { t.life -= dt; t.y -= 40 * dt; }
   texts = texts.filter(t => t.life > 0);
   if (state === 'banner') {
@@ -1015,6 +1053,7 @@ function draw() {
     if (p.prop) emoji(p.prop, p.x + p.dir * size * 0.28, p.y - size * 0.35 - bob, size * 0.38);   // what they carry
     if (p.umbrella) emoji('☂️', p.x, p.y - size * 1.05 - bob, size * 0.7);
     if (p.skater) emoji('🛹', p.x, p.y + size * 0.04, size * 0.65, p.dir === 1);
+    if (party && !p.umbrella) emoji(p.hat, p.x, p.y - size * 1.0 - bob, size * 0.42);   // party hats!
     if (p.hit) emoji('💩', p.x, p.y - size * 0.95 - bob, size * 0.45);   // poop on their head!
   }
   for (const pu of powerups) {
@@ -1036,6 +1075,7 @@ function draw() {
     ctx.globalAlpha = 1;
   }
   for (const p of poops) drawPoopFlying(p);
+  drawConfetti();
   drawPocket();
   if (drag) emoji(ANIMALS[current].food, drag.x, drag.y, 48);
   for (const t of texts) { ctx.globalAlpha = Math.min(1, t.life * 2); label(t.msg, t.x, t.y, 22, t.color); ctx.globalAlpha = 1; }
@@ -1113,6 +1153,7 @@ function draw() {
     emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
   emoji(muted ? '🔇' : '🔊', muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
+  ctx.globalAlpha = party ? 1 : 0.4; emoji('🎉', partyBtn().x, partyBtn().y, 28); ctx.globalAlpha = 1;
 }
 
 let last = performance.now();
