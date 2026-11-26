@@ -79,6 +79,9 @@ const PLACES = [
   { name: 'The Moon', icon: '🌙', indoor: true, lowGravity: true, helmets: true, sky: ['#000010', '#1a237e'], ground: '#9e9e9e', path: null,
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🚩', '🔭', '🪐', '🛰️'],
     deco: [[0.12, 0.85, '🪨', 30], [0.9, 0.9, '🪨', 26]] },
+  { name: 'The Reef', icon: '🐠', indoor: true, underwater: true, helmets: true, sky: ['#0d47a1', '#4fc3f7'], ground: '#e6d3a3', path: null,
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🧍', '🧍‍♀️', '🏃', '🏃‍♀️'], props: ['🐚', '🦀', '🐠'],
+    deco: [[0.08, 0.8, '🪸', 44], [0.3, 0.92, '🐚', 26], [0.72, 0.86, '🪸', 40], [0.94, 0.75, '🌿', 36]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -345,10 +348,10 @@ function shoot(tx, ty) {
   sfx('squeeze', a);
   const start = animalPos();
   const dist = Math.hypot(tx - start.x, ty - start.y);
-  const floaty = !!place().lowGravity;                 // on the moon, poops float slowly in big arcs
-  const dur = (0.35 + dist / 1400) / a.speed * (floaty ? 1.4 : 1);
+  const floaty = !!place().lowGravity, sink = !!place().underwater;   // moon: big floaty arcs, reef: slow wobbly sinking
+  const dur = (0.35 + dist / 1400) / a.speed * (floaty ? 1.4 : sink ? 1.6 : 1);
   const size = superTime > 0 ? Math.max(100, a.splat * 1.8) : a.splat;   // super poop = giant splats
-  const make = (x, y) => ({ sx: start.x, sy: start.y - 30 * ui(), tx: x, ty: y, t: 0, dur, size, animal: current, floaty });
+  const make = (x, y) => ({ sx: start.x, sy: start.y - 30 * ui(), tx: x, ty: y, t: 0, dur, size, animal: current, floaty, sink });
   if (a.line) {                                        // bat: a line of poops dropped from the sky, one after another
     for (let i = 0; i < a.line; i++) {
       const x = tx + (i - (a.line - 1) / 2) * 50;
@@ -482,6 +485,7 @@ const ACHIEVEMENTS = [
   { id: 'mall',    icon: '🛍️', name: 'Shop till you drop', how: 'Reach the mall' },
   { id: 'farm',    icon: '🚜', name: 'Down on the farm', how: 'Reach the farm' },
   { id: 'moon',    icon: '🌙', name: 'One small step', how: 'Reach the moon' },
+  { id: 'reef',    icon: '🐠', name: 'Under the sea', how: 'Reach the reef' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -781,7 +785,7 @@ function finishTutorial() {
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
@@ -1157,6 +1161,26 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The Reef') {
+    const now = performance.now() / 1000, top = pocketTop();
+    ctx.fillStyle = 'rgba(79,195,247,0.35)'; ctx.fillRect(0, hz, W, top - hz);    // water over the sand
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';                                       // light rays from the surface
+    for (let i = 0; i < 5; i++) {
+      const x = (i + 0.5) * W / 5;
+      ctx.beginPath(); ctx.moveTo(x - 20, 0); ctx.lineTo(x + 20, 0); ctx.lineTo(x + 70, top); ctx.lineTo(x + 10, top); ctx.fill();
+    }
+    const fish = ['🐠', '🐟', '🐡', '🐠'];                                          // fish swimming by
+    fish.forEach((f, i) => {
+      const dir = i % 2 ? 1 : -1, sp = 30 + i * 12;
+      const x = ((now * sp * dir + i * 300) % (W + 120) + W + 120) % (W + 120) - 60;
+      emoji(f, x, hz * (0.3 + i * 0.15) + Math.sin(now * 2 + i) * 6, 30 + (i % 2) * 8, dir === 1);
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;                 // bubbles rising
+    for (let i = 0; i < 14; i++) {
+      const bx = (i * 97) % W + Math.sin(now * 2 + i) * 6, by = top - ((now * (30 + (i % 4) * 12) + i * 60) % top);
+      ctx.beginPath(); ctx.arc(bx, by, 2 + (i % 3) * 2, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
   if (here.name === 'The Moon') {
     ctx.fillStyle = '#fff';                                                         // stars (same spots every time)
     for (let i = 0; i < 70; i++) {
@@ -1319,8 +1343,8 @@ function drawPoopFlying(p) {
   }
   if (p.t < 0) return;                                 // not dropped yet
   const k = p.t / p.dur;
-  const x = p.sx + (p.tx - p.sx) * k;
-  const arc = p.drop ? 0 : p.bounced || p.mini ? 45 : p.floaty ? 230 : 120;     // bat poop falls straight down, a bounce is a small hop
+  const x = p.sx + (p.tx - p.sx) * k + (p.sink ? Math.sin(k * 14) * 10 : 0);   // sinking poops wobble
+  const arc = p.drop ? 0 : p.bounced || p.mini ? 45 : p.floaty ? 230 : p.sink ? 50 : 120;     // bat poop falls straight down, a bounce is a small hop
   const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * arc;
   const size = (p.size * 0.9) * (1 - k * 0.45);
   if (ANIMALS[p.animal].homing) emoji('✨', x - (p.tx - p.sx) * 0.06, y + 14, size * 0.8);   // magic sparkles
