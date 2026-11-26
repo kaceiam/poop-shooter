@@ -451,7 +451,7 @@ function unlock(id) {
 }
 function countStat(name, need, id) { stats[name]++; saveAch(); if (stats[name] >= need) unlock(id); }
 
-// ---- Daily challenge: a new one each day, worth 30 coins ----
+// ---- Challenges: a daily one (30 coins) and a weekly big one (100 coins) ----
 const CHALLENGES = [
   { id: 'splat',     text: 'Splat 30 people',              need: 30 },
   { id: 'skaters',   text: 'Splat 3 skaters 🛹',           need: 3 },
@@ -463,32 +463,50 @@ const CHALLENGES = [
   { id: 'points',    text: 'Score 40 points in one game',  need: 40, best: true },
   { id: 'level',     text: 'Reach level 4',                need: 4, best: true },
 ];
-const DAILY_REWARD = 30;
+const WEEKLY = [
+  { id: 'splat',     text: 'Splat 150 people',             need: 150 },
+  { id: 'skaters',   text: 'Splat 15 skaters 🛹',          need: 15 },
+  { id: 'umbrellas', text: 'Splat 12 umbrella people ☂️',  need: 12 },
+  { id: 'dodgers',   text: 'Splat 20 sneaky people',       need: 20 },
+  { id: 'combo',     text: 'Land 10 COMBO x3 hits 🔥',     need: 10 },
+  { id: 'boss',      text: 'Beat 3 giant bosses 👑',       need: 3 },
+  { id: 'powers',    text: 'Grab 12 power-ups ⭐',         need: 12 },
+  { id: 'points',    text: 'Score 80 points in one game',  need: 80, best: true },
+  { id: 'level',     text: 'Reach level 8',                need: 8, best: true },
+];
 const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; })();
-const challenge = (() => {                             // same challenge all day, a different one tomorrow
-  let h = 0; for (const c of todayKey) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return CHALLENGES[h % CHALLENGES.length];
+const weekKey = (() => {                               // changes every Sunday
+  const d = new Date(), jan1 = new Date(d.getFullYear(), 0, 1);
+  return `${d.getFullYear()}-w${Math.floor(((d - jan1) / 86400000 + jan1.getDay()) / 7)}`;
 })();
-let daily = { day: todayKey, progress: 0, done: false };
-try {
-  const saved = JSON.parse(localStorage.getItem('poopDaily') || 'null');
-  if (saved && saved.day === todayKey) daily = saved;
-} catch (e) {}
-// kind = what happened; for "best" challenges (points, level) the amount is the new total, not +1.
-function dailyEvent(kind, amount = 1) {
-  if (daily.done || challenge.id !== kind) return;
-  daily.progress = challenge.best ? Math.max(daily.progress, amount) : daily.progress + amount;
-  if (daily.progress >= challenge.need) {
-    daily.done = true;
-    coins += DAILY_REWARD; saveShop();
-    toast = { msg: `📅 Daily challenge done! +${DAILY_REWARD} 🪙`, time: 3.5 };
-    sfx('power');
-  }
-  try { localStorage.setItem('poopDaily', JSON.stringify(daily)); } catch (e) {}
+function makeChallenge({ icon, name, doneName, list, period, reward, store }) {
+  let h = 0; for (const ch of period) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const c = { goal: list[h % list.length], progress: 0, done: false };   // same goal all day/week
+  try {
+    const s = JSON.parse(localStorage.getItem(store) || 'null');
+    if (s && s.day === period) { c.progress = s.progress; c.done = s.done; }
+  } catch (e) {}
+  // kind = what happened; for "best" goals (points, level) the amount is the new total, not +1.
+  c.event = (kind, amount) => {
+    if (c.done || c.goal.id !== kind) return;
+    c.progress = c.goal.best ? Math.max(c.progress, amount) : c.progress + amount;
+    if (c.progress >= c.goal.need) {
+      c.done = true;
+      coins += reward; saveShop();
+      toast = { msg: `${icon} ${doneName} done! +${reward} 🪙`, time: 3.5 };
+      sfx('power');
+    }
+    try { localStorage.setItem(store, JSON.stringify({ day: period, progress: c.progress, done: c.done })); } catch (e) {}
+  };
+  c.text = () => c.done ? `${icon} ${name}: done! ✅`
+    : `${icon} ${name}: ${c.goal.text} (${Math.min(c.progress, c.goal.need)}/${c.goal.need}) · 🪙 ${reward}`;
+  return c;
 }
-const dailyText = () => daily.done
-  ? `📅 Today's challenge: done! ✅`
-  : `📅 Today: ${challenge.text} (${Math.min(daily.progress, challenge.need)}/${challenge.need}) · 🪙 ${DAILY_REWARD}`;
+const daily = makeChallenge({ icon: '📅', name: 'Today', doneName: 'Daily challenge', list: CHALLENGES,
+  period: todayKey, reward: 30, store: 'poopDaily' });
+const weekly = makeChallenge({ icon: '🏅', name: 'This week', doneName: 'Weekly big challenge', list: WEEKLY,
+  period: weekKey, reward: 100, store: 'poopWeekly' });
+function dailyEvent(kind, amount = 1) { daily.event(kind, amount); weekly.event(kind, amount); }
 
 // ---- Combo streak: hit again within 2 seconds for x2, then x3 ----
 const STREAK_TIME = 2;
@@ -1246,8 +1264,8 @@ function draw() {
       }
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
       if (short) y -= Math.min(32, W / 16) * 0.5;
-      label('Click to start', W / 2, y + Math.min(32, W / 16) * 1.5, Math.min(32, W / 16), '#ff7ad9');
-      if (best > 0) label(`Your best: ${best} points · Level ${bestLevel}`, W / 2, y + Math.min(32, W / 16) * 3, Math.min(18, W / 22), '#fff');
+      label('Click to start', W / 2, Math.min(y + Math.min(32, W / 16) * 1.5, trophyLineY() - 110), Math.min(32, W / 16), '#ff7ad9');
+      if (best > 0) label(`Your best: ${best} points · Level ${bestLevel}`, W / 2, Math.min(y + Math.min(32, W / 16) * 3, trophyLineY() - 80), Math.min(18, W / 22), '#fff');
     } else {
       const short = H < 520;                           // squeeze things together on short screens
       const ts = short ? Math.min(20, W / 22) : Math.min(26, W / 18), ss = short ? Math.min(s, H / 8) : s;
@@ -1260,10 +1278,12 @@ function draw() {
       } else {
         label(`Best: ${best} points · Level ${bestLevel}`, W / 2, y + ts * 0.4, ts, '#fff');
       }
-      label('Click to play again', W / 2, Math.min(y + ts * 2.6, trophyLineY() - 40), Math.min(32, W / 16), '#ff7ad9');
+      label('Click to play again', W / 2, Math.min(y + ts * 2.6, trophyLineY() - 82), Math.min(32, W / 16), '#ff7ad9');
     }
     const fs = Math.min(18, W / 22);
-    para(dailyText(), W / 2, trophyLineY() - 34, Math.min(16, W / 25), daily.done ? '#69f0ae' : '#fff', W - 24);
+    const cs = Math.min(15, W / 26);                   // today's and this week's challenge, one line each
+    label(daily.text(), W / 2, trophyLineY() - 54, cs, daily.done ? '#69f0ae' : '#fff', true, 'center', W - 20);
+    label(weekly.text(), W / 2, trophyLineY() - 32, cs, weekly.done ? '#69f0ae' : '#ffe14d', true, 'center', W - 20);
     label(`🛒 Shop · 🪙 ${coins}`, W / 6, trophyLineY(), fs, '#9ff');
     label('❓ Help', W / 2, trophyLineY(), fs, '#fff');
     label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 5 / 6, trophyLineY(), fs, '#ffe14d');
