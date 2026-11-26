@@ -295,8 +295,11 @@ function strike(person, countsForStreak, x, y, fromCloud) {
     addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
     return true;
   }
-  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); }
-  if (person.dodger) countStat('dodgers', 5, 'dodger5');
+  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); dailyEvent('boss'); }
+  if (person.dodger) { countStat('dodgers', 5, 'dodger5'); dailyEvent('dodgers'); }
+  if (person.skater) dailyEvent('skaters');
+  if (person.hadUmbrella) dailyEvent('umbrellas');
+  dailyEvent('splat');
   unlock('first');
   person.hit = true;
   person.dir = person.x < W / 2 ? -1 : 1;              // run off the nearest side
@@ -358,6 +361,45 @@ function unlock(id) {
 }
 function countStat(name, need, id) { stats[name]++; saveAch(); if (stats[name] >= need) unlock(id); }
 
+// ---- Daily challenge: a new one each day, worth 30 coins ----
+const CHALLENGES = [
+  { id: 'splat',     text: 'Splat 30 people',              need: 30 },
+  { id: 'skaters',   text: 'Splat 3 skaters 🛹',           need: 3 },
+  { id: 'umbrellas', text: 'Splat 3 umbrella people ☂️',   need: 3 },
+  { id: 'dodgers',   text: 'Splat 4 sneaky people',        need: 4 },
+  { id: 'combo',     text: 'Get a COMBO x3 🔥',            need: 1 },
+  { id: 'boss',      text: 'Beat a giant boss 👑',         need: 1 },
+  { id: 'powers',    text: 'Grab 3 power-ups ⭐',          need: 3 },
+  { id: 'points',    text: 'Score 40 points in one game',  need: 40, best: true },
+  { id: 'level',     text: 'Reach level 4',                need: 4, best: true },
+];
+const DAILY_REWARD = 30;
+const todayKey = (() => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; })();
+const challenge = (() => {                             // same challenge all day, a different one tomorrow
+  let h = 0; for (const c of todayKey) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return CHALLENGES[h % CHALLENGES.length];
+})();
+let daily = { day: todayKey, progress: 0, done: false };
+try {
+  const saved = JSON.parse(localStorage.getItem('poopDaily') || 'null');
+  if (saved && saved.day === todayKey) daily = saved;
+} catch (e) {}
+// kind = what happened; for "best" challenges (points, level) the amount is the new total, not +1.
+function dailyEvent(kind, amount = 1) {
+  if (daily.done || challenge.id !== kind) return;
+  daily.progress = challenge.best ? Math.max(daily.progress, amount) : daily.progress + amount;
+  if (daily.progress >= challenge.need) {
+    daily.done = true;
+    coins += DAILY_REWARD; saveShop();
+    toast = { msg: `📅 Daily challenge done! +${DAILY_REWARD} 🪙`, time: 3.5 };
+    sfx('power');
+  }
+  try { localStorage.setItem('poopDaily', JSON.stringify(daily)); } catch (e) {}
+}
+const dailyText = () => daily.done
+  ? `📅 Today's challenge: done! ✅`
+  : `📅 Today: ${challenge.text} (${Math.min(daily.progress, challenge.need)}/${challenge.need}) · 🪙 ${DAILY_REWARD}`;
+
 // ---- Combo streak: hit again within 2 seconds for x2, then x3 ----
 const STREAK_TIME = 2;
 let streak = 0, streakTimer = 0;
@@ -368,7 +410,7 @@ function bumpStreak(x, y) {
     addText(x, y - 80, `COMBO x${Math.min(3, streak)}!`, '#ff7ad9');
     sfx('combo');
   }
-  if (streak >= 3) unlock('combo3');
+  if (streak >= 3) { unlock('combo3'); dailyEvent('combo'); }
 }
 
 // ---- Feeding (the reload!) ----
@@ -410,6 +452,7 @@ function grabPowerup(pu) {
   if (pu.kind === 'super') superTime = POWER_TIME;
   if (pu.kind === 'food') ANIMALS.forEach(a => a.ammo = a.maxAmmo);
   countStat('powers', 3, 'power3');
+  dailyEvent('powers');
   addText(W / 2, horizon() + 70, `${POWERS[pu.kind].emoji} ${POWERS[pu.kind].msg}`, '#ffe14d');
   sfx('power');
 }
@@ -516,6 +559,7 @@ function startLevel() {
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
   const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival' }[place().name];
   if (placeId) unlock(placeId);
+  dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
   ANIMALS.forEach(a => a.ammo = a.maxAmmo);
   for (let i = 0; i < 3; i++) { spawnPerson(); people[people.length - 1].x = Math.random() * W; }
@@ -594,8 +638,10 @@ function update(dt) {
     newBest = score > best && score > 0;
     sfx(newBest ? 'level' : 'end');                     // happy tune for a new best, sad tune otherwise
     coins += score; saveShop();                        // points become coins for the shop
+    dailyEvent('points', score);
     if (score > best) { best = score; try { localStorage.setItem('poopBest', best); } catch (e) {} }
     if (level > bestLevel) { bestLevel = level; try { localStorage.setItem('poopBestLevel', bestLevel); } catch (e) {} }
+    return;                                            // game over: nothing else happens this frame
   }
 
   spawnTimer -= dt;
@@ -990,6 +1036,7 @@ function draw() {
       label('Click to play again', W / 2, Math.min(y + ts * 2.6, trophyLineY() - 40), Math.min(32, W / 16), '#ff7ad9');
     }
     const fs = Math.min(18, W / 22);
+    para(dailyText(), W / 2, trophyLineY() - 34, Math.min(16, W / 25), daily.done ? '#69f0ae' : '#fff', W - 24);
     label(`🛒 Shop · 🪙 ${coins}`, W * 0.27, trophyLineY(), fs, '#9ff');
     label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 0.73, trophyLineY(), fs, '#ffe14d');
     if (showTrophies) drawTrophies();
