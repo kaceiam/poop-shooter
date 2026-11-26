@@ -41,6 +41,8 @@ const ANIMALS = [
     price: 100, shopText: 'Drops a line of 4 poops from the sky' },
   { name: 'Penguin',  emoji: '🐧', food: '🐟', foodName: 'fish', maxAmmo: 2, perFood: 1, splat: 40, speed: 1.0, freeze: true,
     price: 150, shopText: 'Ice poop freezes people nearby' },
+  { name: 'Octopus',  emoji: '🐙', food: '🦐', foodName: 'shrimp', maxAmmo: 2, perFood: 1, splat: 34, speed: 1.0, split: 4,
+    price: 200, shopText: 'Poop splits into 4 mini poops' },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 // What each animal does, for the help screen (shop animals use their shopText).
@@ -342,6 +344,15 @@ function land(p) {
   splats.push({ x: p.tx, y: p.ty, size: p.size, life: 4, magic: !!ANIMALS[p.animal].homing, ice: !!ANIMALS[p.animal].freeze });
   if (ANIMALS[p.animal].freeze) freezeAround(p.tx, p.ty);   // penguin!
   if (ANIMALS[p.animal].stink) clouds.push({ x: p.tx, y: p.ty, r: 60, life: 3, got: new Set() });   // skunk!
+  if (ANIMALS[p.animal].split && !p.mini) {            // octopus: split into mini poops that splash outward
+    const n = ANIMALS[p.animal].split;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / n) * Math.PI * 2 + Math.PI / 4;
+      const tx = Math.max(20, Math.min(W - 20, p.tx + Math.cos(ang) * 80));
+      const ty = Math.max(horizon() + 20, Math.min(pocketTop() - 20, p.ty + Math.sin(ang) * 45));
+      poops.push({ sx: p.tx, sy: p.ty, tx, ty, t: 0, dur: 0.3, size: Math.max(20, p.size * 0.6), animal: p.animal, mini: true });
+    }
+  }
   if (ANIMALS[p.animal].bounce && !p.bounced) {        // duck: hop forward to a second spot
     const tx = Math.max(20, Math.min(W - 20, p.tx + (p.tx - p.sx) * 0.4));
     const ty = Math.max(horizon() + 20, Math.min(pocketTop() - 20, p.ty + (p.ty - p.sy) * 0.4));
@@ -665,6 +676,7 @@ addEventListener('keydown', e => {
   const n = parseInt(e.key);
   if (n >= 1 && n <= ANIMALS.length) selectAnimal(n - 1);
   if (e.key === '0' && ANIMALS.length >= 10) selectAnimal(9);   // 0 is the 10th animal
+  if (e.key === '-' && ANIMALS.length >= 11) selectAnimal(10);  // - is the 11th
   if (e.key === 'm' || e.key === 'M') toggleMute();
   if (e.key === 'h' || e.key === 'H') toggleParty();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
@@ -1205,7 +1217,7 @@ function drawPocket() {
     emoji(ANIMALS[i].emoji, r.x + r.w / 2, r.y + r.h / 2, r.w * 0.62);
     ctx.globalAlpha = 1;
     if (locked) emoji('🔒', r.x + r.w - 10, r.y + r.h - 10, r.w * 0.32);
-    label(String((i + 1) % 10), r.x + 9, r.y + 10, 12, '#fff', false);
+    label(['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-'][i] || '', r.x + 9, r.y + 10, 12, '#fff', false);   // the key for each animal
   });
 }
 
@@ -1217,7 +1229,7 @@ function drawPoopFlying(p) {
   if (p.t < 0) return;                                 // not dropped yet
   const k = p.t / p.dur;
   const x = p.sx + (p.tx - p.sx) * k;
-  const arc = p.drop ? 0 : p.bounced ? 45 : p.floaty ? 230 : 120;     // bat poop falls straight down, a bounce is a small hop
+  const arc = p.drop ? 0 : p.bounced || p.mini ? 45 : p.floaty ? 230 : 120;     // bat poop falls straight down, a bounce is a small hop
   const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * arc;
   const size = (p.size * 0.9) * (1 - k * 0.45);
   if (ANIMALS[p.animal].homing) emoji('✨', x - (p.tx - p.sx) * 0.06, y + 14, size * 0.8);   // magic sparkles
