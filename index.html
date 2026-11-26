@@ -127,7 +127,11 @@ canvas.addEventListener('pointerdown', e => {
     if (p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h) { current = i; return; }
   }
   const b = bowlPos();
-  if (Math.hypot(p.x - b.x, p.y - b.y) < 70) { drag = { x: p.x, y: p.y }; return; }
+  if (Math.hypot(p.x - b.x, p.y - b.y) < 70) {
+    drag = { x: p.x, y: p.y };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}  // keep the food even if you drag off the edge
+    return;
+  }
   if (p.y < pocketTop()) shoot(p.x, p.y);
 });
 canvas.addEventListener('pointermove', e => { if (drag) { const p = pointer(e); drag.x = p.x; drag.y = p.y; } });
@@ -137,6 +141,7 @@ canvas.addEventListener('pointerup', () => {
   if (Math.hypot(drag.x - a.x, drag.y - (a.y - 20)) < 80) feed();
   drag = null;
 });
+canvas.addEventListener('pointercancel', () => { drag = null; });
 addEventListener('keydown', e => {
   const n = parseInt(e.key);
   if (n >= 1 && n <= ANIMALS.length) current = n - 1;
