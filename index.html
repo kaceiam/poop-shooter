@@ -104,6 +104,9 @@ const PLACES = [
   { name: 'The City', icon: '🌃', indoor: true, rainy: true, sky: ['#0b0f2b', '#2c2a5a'], ground: '#3b3b48', path: '#f2c14e',
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['📱', '📱', '🍕', '🛍️', '🌂'],
     deco: [[0.1, 0.9, '🚏', 40], [0.88, 0.85, '🗑️', 30]] },
+  { name: 'The Jungle', icon: '🌴', sky: ['#1b5e20', '#81c784'], ground: '#558b2f', path: '#8d6e63',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🧭', '🗺️', '🔭', '🍌'],
+    deco: [[0.06, 0.85, '🌿', 46], [0.5, 0.95, '🍄', 30], [0.7, 0.82, '🌺', 32]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -590,6 +593,7 @@ const ACHIEVEMENTS = [
   { id: 'reef',    icon: '🐠', name: 'Under the sea', how: 'Reach the reef' },
   { id: 'mountain', icon: '🏔️', name: 'Snow day', how: 'Reach the mountain' },
   { id: 'city',    icon: '🌃', name: 'City lights', how: 'Reach the city at night' },
+  { id: 'jungle',  icon: '🌴', name: 'Jungle explorer', how: 'Reach the jungle' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -982,7 +986,7 @@ function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
   reactTimer = 5;
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city', 'The Jungle': 'jungle' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
@@ -1419,6 +1423,31 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The Jungle') {
+    const top = pocketTop(), now = performance.now() / 1000;
+    for (let i = 0; i < 6; i++) emoji('🌴', (i + 0.5) * W / 6, hz - 20, Math.min(70, hz * 0.6));   // jungle trees
+    const wx = W * 0.82, ww = Math.min(60, W * 0.08);                                // waterfall
+    ctx.fillStyle = '#4fc3f7'; ctx.fillRect(wx, 0, ww, hz + 20);
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      const sx = wx + 6 + i * (ww - 12) / 5, sy = (now * 220 + i * 37) % (hz + 20);
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + 18); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(179,229,252,0.6)';                                          // splashy pool at the bottom
+    ctx.beginPath(); ctx.ellipse(wx + ww / 2, hz + 22, ww, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2e7d32'; ctx.lineWidth = 3;                                   // hanging vines that sway
+    for (let i = 0; i < 7; i++) {
+      const vx = (i + 0.3) * W / 7, len = hz * (0.4 + (i % 3) * 0.15), sway = Math.sin(now * 1.2 + i) * 8;
+      ctx.beginPath(); ctx.moveTo(vx, 0); ctx.quadraticCurveTo(vx + sway, len / 2, vx + sway * 1.5, len); ctx.stroke();
+      emoji('🍃', vx + sway * 1.5, len, 16);
+    }
+    const px = ((now * 90) % (W + 160)) - 80;                                        // parrots flying across
+    emoji('🦜', px, hz * 0.3 + Math.sin(now * 3) * 10, 32, true);
+    emoji('🦜', W - ((now * 70 + 400) % (W + 160)) + 80, hz * 0.5 + Math.sin(now * 2.5) * 8, 26);
+    const mx = W * 0.3 + Math.sin(now * 1.5) * 40;                                   // a monkey swinging on a vine
+    ctx.strokeStyle = '#33691e'; ctx.beginPath(); ctx.moveTo(W * 0.3, 0); ctx.lineTo(mx, hz * 0.55); ctx.stroke();
+    emoji('🐒', mx, hz * 0.55 + 12, 30);
+  }
   if (here.name === 'The City') {
     const top = pocketTop(), now = performance.now() / 1000;
     emoji('🌙', W * 0.85, hz * 0.3, Math.min(44, hz * 0.35));
