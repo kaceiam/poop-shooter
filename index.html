@@ -94,24 +94,28 @@ let score = 0, timeLeft = LEVEL_TIME, state = 'title';   // states: title, play,
 let squeeze = 0, chew = 0, hungryShake = 0;
 let drag = null;            // the food you're carrying
 let spawnTimer = 0;
-let best = 0, bestLevel = 0, muted = false, newBest = false;
+let best = 0, bestLevel = 0, volume = 2, newBest = false;   // volume: 0 = off, 1 = quiet, 2 = loud
 try {
   best = +localStorage.getItem('poopBest') || 0;
   bestLevel = +localStorage.getItem('poopBestLevel') || 0;
-  muted = localStorage.getItem('poopMute') === '1';
+  const v = localStorage.getItem('poopVolume');
+  volume = v !== null ? +v : localStorage.getItem('poopMute') === '1' ? 0 : 2;   // old saves that were muted stay muted
 } catch (e) {}
 
 // ---- Sounds (made with code, no sound files) ----
-let audio = null, noiseBuf = null;
+let audio = null, noiseBuf = null, master = null;
+const VOLUME_LEVEL = [0, 0.35, 1];
 function sfx(kind, animal) {
-  if (muted) return;
+  if (!volume) return;
   if (!audio) {
     try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     noiseBuf = audio.createBuffer(1, audio.sampleRate * 0.5, audio.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    master = audio.createGain(); master.connect(audio.destination);   // one volume knob for all sounds
   }
   if (audio.state === 'suspended') audio.resume();
+  master.gain.value = VOLUME_LEVEL[volume];
   const t = audio.currentTime;
   const tone = (type, f1, f2, dur, vol, delay = 0) => {
     const o = audio.createOscillator(), g = audio.createGain();
@@ -120,7 +124,7 @@ function sfx(kind, animal) {
     o.frequency.exponentialRampToValueAtTime(f2, t + delay + dur);
     g.gain.setValueAtTime(vol, t + delay);
     g.gain.exponentialRampToValueAtTime(0.001, t + delay + dur);
-    o.connect(g).connect(audio.destination);
+    o.connect(g).connect(master);
     o.start(t + delay); o.stop(t + delay + dur + 0.02);
   };
   const noise = (dur, freq, vol) => {
@@ -130,7 +134,7 @@ function sfx(kind, animal) {
     f.frequency.exponentialRampToValueAtTime(100, t + dur);
     g.gain.setValueAtTime(vol, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    s.connect(f).connect(g).connect(audio.destination);
+    s.connect(f).connect(g).connect(master);
     s.start(t); s.stop(t + dur);
   };
   if (kind === 'squeeze') {                                   // pfffft! bigger animal = deeper
@@ -151,9 +155,11 @@ function sfx(kind, animal) {
   if (kind === 'level')  [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f * 1.01, 0.16, 0.07, i * 0.16));
   if (kind === 'end')    [392, 330, 262, 196].forEach((f, i) => tone('triangle', f, f * 0.98, 0.25, 0.15, i * 0.22));
 }
+// The speaker button steps through loud -> quiet -> off -> loud.
 function toggleMute() {
-  muted = !muted;
-  try { localStorage.setItem('poopMute', muted ? '1' : '0'); } catch (e) {}
+  volume = (volume + 2) % 3;
+  try { localStorage.setItem('poopVolume', volume); } catch (e) {}
+  sfx('switch');                                       // a little beep so you can hear the new volume
 }
 // ---- Animal shop: your points become coins after each game. Special animals cost coins. ----
 let coins = 0, owned = new Set(), showShop = false, shopMsg = '', shopRows = [];
@@ -1217,7 +1223,7 @@ function draw() {
   } else if (canPause()) {
     emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
-  emoji(muted ? '🔇' : '🔊', muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
+  emoji(['🔇', '🔉', '🔊'][volume], muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
   ctx.globalAlpha = party ? 1 : 0.4; emoji('🎉', partyBtn().x, partyBtn().y, 28); ctx.globalAlpha = 1;
 }
 
