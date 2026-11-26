@@ -859,7 +859,11 @@ canvas.addEventListener('pointerdown', e => {
     if (p.x > ph.x && p.x < ph.x + ph.w && p.y > ph.y && p.y < ph.y + ph.h) { takePhoto(); return; }
     setPaused(false); return;
   }
-  if (state === 'duoReady') { beginDuoTurn(); return; }   // two players: tap to start the next turn
+  if (state === 'duoReady') {                          // two players: tap to start the next turn (or change names)
+    const nb = namesBtn();
+    if (duo.turn === 1 && p.x > nb.x && p.x < nb.x + nb.w && p.y > nb.y && p.y < nb.y + nb.h) { askNames(); return; }
+    beginDuoTurn(); return;
+  }
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   const zd = zenDoneBtn();
@@ -1016,13 +1020,30 @@ function playAgain() {                                 // "play again" keeps the
   else if (state === 'over' && mode === 'duo') startDuo();
   else startGame();
 }
+// Players' names for 2 Players (saved). Empty names show as "Player 1" / "Player 2".
+let duoNames = ['', ''];
+try { duoNames = JSON.parse(localStorage.getItem('poopDuoNames') || '["",""]'); } catch (e) {}
+const pName = n => (duoNames[n - 1] || '').trim() || `Player ${n}`;
+const namesBtn = () => ({ x: W / 2 - 100, y: H * 0.72, w: 200, h: 42 });
+function askNames() {
+  for (let i = 0; i < 2; i++) {
+    const v = window.prompt(`Name for player ${i + 1}?`, duoNames[i] || '');
+    if (v !== null) duoNames[i] = v.trim().slice(0, 12);   // short names fit on the screen
+  }
+  try { localStorage.setItem('poopDuoNames', JSON.stringify(duoNames)); } catch (e) {}
+}
 function drawDuoReady() {
   ctx.fillStyle = 'rgba(40,20,5,0.75)'; ctx.fillRect(0, 0, W, H);
   const s = Math.min(48, W / 10);
-  if (duo.turn === 2) label(`Player 1 scored ${duo.scores[0]}!`, W / 2, H * 0.28, Math.min(26, W / 16), '#fff');
-  label(`👤 Player ${duo.turn}`, W / 2, H * 0.4, s, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
+  if (duo.turn === 2) label(`${pName(1)} scored ${duo.scores[0]}!`, W / 2, H * 0.28, Math.min(26, W / 16), '#fff');
+  label(`👤 ${pName(duo.turn)}`, W / 2, H * 0.4, s, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
   label(duo.turn === 1 ? 'Get ready! You have 30 seconds.' : 'Your turn! Beat that score!', W / 2, H * 0.4 + s, Math.min(22, W / 20), '#fff', true, 'center', W - 24);
   label('Tap to start', W / 2, H * 0.62, Math.min(32, W / 14), '#ff7ad9');
+  if (duo.turn === 1) {                                // set the players' names (saved for next time)
+    const nb = namesBtn();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.roundRect(nb.x, nb.y, nb.w, nb.h, 12); ctx.fill();
+    label('✏️ Change names', nb.x + nb.w / 2, nb.y + nb.h / 2, 17, '#fff', true, 'center', nb.w - 12);
+  }
 }
 
 // ---- First-play tutorial. The clock waits until it's done. ----
@@ -1266,7 +1287,7 @@ function drawHud() {
   if (mode === 'zen') label('🧘 Zen', hudX, 30, 26, '#9ff');
   else label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
   if (mode === 'zen') label(`Splats: ${zenSplats}`, hudX, 62, 18, '#9ff');
-  else if (mode === 'duo') label(`👤 Player ${duo.turn}`, hudX, 62, 18, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
+  else if (mode === 'duo') label(`👤 ${pName(duo.turn)}`, hudX, 62, 18, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
   else if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
   else label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
   const active = [];
@@ -1619,9 +1640,9 @@ function draw() {
       let y = short ? H * 0.2 : H * 0.28;
       const rush = mode === 'rush', two = mode === 'duo' && duo;
       const [s1, s2] = two ? duo.scores : [0, 0];
-      const winner = two ? (s1 > s2 ? 'PLAYER 1 WINS! 🏆' : s2 > s1 ? 'PLAYER 2 WINS! 🏆' : "IT'S A TIE! 🤝") : '';
+      const winner = two ? (s1 > s2 ? `${pName(1).toUpperCase()} WINS! 🏆` : s2 > s1 ? `${pName(2).toUpperCase()} WINS! 🏆` : "IT'S A TIE! 🤝") : '';
       label(two ? winner : rush ? 'BOSS RUSH OVER!' : "TIME'S UP!", W / 2, y, ss, '#ffe14d', true, 'center', W - 24);
-      const said = two ? `👤 Player 1: ${s1} points   ·   👤 Player 2: ${s2} points`
+      const said = two ? `👤 ${pName(1)}: ${s1} points   ·   👤 ${pName(2)}: ${s2} points`
         : rush ? `You beat ${rushBeaten} giant boss${rushBeaten === 1 ? '' : 'es'}! (+${score} 🪙)`
         : `You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`;
       y = para(said, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
