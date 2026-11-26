@@ -213,6 +213,11 @@ const ANIMAL_HATS = [
   { id: 'sun',    emoji: '👒', name: 'sun hat',  price: 25 },
   { id: 'grad',   emoji: '🎓', name: 'grad cap', price: 35 },
   { id: 'helmet', emoji: '⛑️', name: 'helmet',   price: 35 },
+  { id: 'flower', emoji: '🌸', name: 'flower',   price: 15 },
+  { id: 'berry',  emoji: '🍓', name: 'strawberry', price: 20 },
+  { id: 'star',   emoji: '⭐', name: 'star',     price: 40 },
+  { id: 'rainbow', emoji: '🌈', name: 'rainbow', price: 50 },
+  { id: 'fire',   emoji: '🔥', name: 'fire hat', price: 60 },
   { id: 'crown',  emoji: '👑', name: 'crown',    price: 100 },
 ];
 let shopTab = 'animals', shopTabs = [], shopCells = [], hatsOwned = new Set(), hatOn = '';
@@ -1244,7 +1249,7 @@ function drawShop() {
       label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
     });
   } else {
-    const cols = Math.max(2, Math.min(4, Math.floor((W - 24) / 100))), rows = Math.ceil(ANIMAL_HATS.length / cols);
+    const cols = Math.max(2, Math.min(6, Math.floor((W - 24) / 100))), rows = Math.ceil(ANIMAL_HATS.length / cols);
     const cw = Math.min(110, (W - 24) / cols), ch = Math.min(96, (H - top - 90) / rows), x0 = W / 2 - (cols * cw) / 2;
     ANIMAL_HATS.forEach((h, i) => {
       const x = x0 + (i % cols) * cw, y = top + Math.floor(i / cols) * ch, have = hatsOwned.has(h.id), wearing = hatOn === h.id;
