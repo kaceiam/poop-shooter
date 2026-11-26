@@ -1243,16 +1243,16 @@ function drawShop() {
 }
 // ---- How to play: 4 pages, tap to go to the next one ----
 // ---- What's new: shown once after each update, tap to close ----
-const VERSION = '2026-11-26d';                         // change this after each update so the note shows again
+const VERSION = '2026-11-26e';                         // change this after each update so the note shows again
 const NEWS = [
-  ['🧘', 'Zen mode', 'No clock, just splat for fun. Top left, or press Z'],
+  ['👥', '2 Players', 'Take turns with a friend. Highest score wins! (T)'],
+  ['🏔️', 'The mountain', 'Skiers, snowboarders, and poops roll downhill'],
+  ['😱', 'Reactions', 'People run from the elephant and stare at the unicorn'],
+  ['🧘', 'Zen mode', 'No clock, just splat for fun (Z)'],
   ['🐠', 'The reef', 'Underwater! Poops sink slowly and wobble'],
   ['🦘', 'Kangaroo', 'New in the shop: boomerang poop'],
   ['📊', 'Stats', 'Your lifetime splats, time played and more'],
-  ['👑', 'Boss Rush', 'Giant bosses back to back! Top left, or press B'],
-  ['🌙', 'The moon', 'Low gravity: floaty poops and bouncy astronauts'],
-  ['🐙', 'Octopus', 'Poop splits into 4 mini poops'],
-  ['🎩', 'Hats', 'Buy hats for your animal in the shop'],
+  ['👑', 'Boss Rush', 'Giant bosses back to back! (B)'],
 ];
 let showNews = false;
 try { showNews = localStorage.getItem('poopSeenVersion') !== VERSION; } catch (e) {}
