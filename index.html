@@ -29,6 +29,9 @@ const ANIMALS = [
   { name: 'Dog',      emoji: '🐶', food: '🦴', foodName: 'bones',   maxAmmo: 4, perFood: 2, splat: 45, speed: 1.2 },
   { name: 'Cow',      emoji: '🐮', food: '🌿', foodName: 'grass',   maxAmmo: 3, perFood: 1, splat: 65, speed: 0.9 },
   { name: 'Elephant', emoji: '🐘', food: '🥜', foodName: 'peanuts', maxAmmo: 2, perFood: 1, splat: 95, speed: 0.7 },
+  // Special animals: the monkey throws 3 at once, the unicorn's magic poop follows a person.
+  { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3 },
+  { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
@@ -106,6 +109,7 @@ function sfx(kind, animal) {
   if (kind === 'eww')    tone('square', 560, 240, 0.4, 0.07);
   if (kind === 'nom')    { tone('sine', 300, 450, 0.08, 0.3); tone('sine', 300, 450, 0.08, 0.3, 0.15); }
   if (kind === 'empty')  tone('triangle', 300, 140, 0.3, 0.25);
+  if (kind === 'magic')  [880, 1175, 1568].forEach((f, i) => tone('sine', f, f * 1.02, 0.15, 0.08, i * 0.06));
   if (kind === 'dodge')  { noise(0.15, 3000, 0.2); tone('sine', 500, 1200, 0.12, 0.08); }
   if (kind === 'switch') tone('sine', 600, 900, 0.08, 0.15);
   if (kind === 'level')  [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f * 1.01, 0.16, 0.07, i * 0.16));
@@ -166,11 +170,28 @@ function shoot(tx, ty) {
   sfx('squeeze', a);
   const start = animalPos();
   const dist = Math.hypot(tx - start.x, ty - start.y);
-  poops.push({ sx: start.x, sy: start.y - 30 * ui(), tx, ty, t: 0, dur: (0.35 + dist / 1400) / a.speed, size: a.splat, animal: current });
+  const dur = (0.35 + dist / 1400) / a.speed;
+  const make = (x, y) => ({ sx: start.x, sy: start.y - 30 * ui(), tx: x, ty: y, t: 0, dur, size: a.splat, animal: current });
+  if (a.spread) {                                      // monkey: a spread of poops
+    const gap = 55;
+    for (let i = 0; i < a.spread; i++) poops.push(make(tx + (i - (a.spread - 1) / 2) * gap, ty));
+  } else {
+    const poop = make(tx, ty);
+    if (a.homing) {                                    // unicorn: lock on to the person nearest the click
+      let bestD = 220;
+      for (const p of people) {
+        if (p.hit) continue;
+        const d = Math.hypot(p.x - tx, (p.y - 35 * p.scale) - ty);
+        if (d < bestD) { bestD = d; poop.follow = p; }
+      }
+      sfx('magic');
+    }
+    poops.push(poop);
+  }
 }
 
 function land(p) {
-  splats.push({ x: p.tx, y: p.ty, size: p.size, life: 4 });
+  splats.push({ x: p.tx, y: p.ty, size: p.size, life: 4, magic: !!ANIMALS[p.animal].homing });
   sfx('splat');
   let hits = 0;
   for (const person of people) {
@@ -324,7 +345,11 @@ function update(dt) {
   checkDodges(dt);
   movePeople(dt);
 
-  for (const p of poops) { p.t += dt; if (p.t >= p.dur) land(p); }
+  for (const p of poops) {
+    if (p.follow && !p.follow.hit) { p.tx = p.follow.x; p.ty = p.follow.y - 70 * p.follow.scale * 0.45; }
+    p.t += dt;
+    if (p.t >= p.dur) land(p);
+  }
   poops = poops.filter(p => p.t < p.dur);
   if (state === 'play' && levelScore >= goal()) levelUp();
   for (const s of splats) s.life -= dt;
@@ -435,6 +460,7 @@ function drawPoopFlying(p) {
   const x = p.sx + (p.tx - p.sx) * k;
   const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * 120;
   const size = (p.size * 0.9) * (1 - k * 0.45);
+  if (ANIMALS[p.animal].homing) emoji('✨', x - (p.tx - p.sx) * 0.06, y + 14, size * 0.8);   // magic sparkles
   emoji('💩', x, y, size);
 }
 
@@ -442,7 +468,7 @@ function draw() {
   drawPlace();
   for (const s of splats) {
     ctx.globalAlpha = Math.min(1, s.life);
-    ctx.fillStyle = '#6b3e13';
+    ctx.fillStyle = s.magic ? '#ff7ad9' : '#6b3e13';
     ctx.beginPath(); ctx.ellipse(s.x, s.y, s.size * 0.6, s.size * 0.25, 0, 0, Math.PI * 2); ctx.fill();
     emoji('💩', s.x, s.y - s.size * 0.15, s.size * 0.6);
     ctx.globalAlpha = 1;
@@ -491,7 +517,7 @@ function draw() {
       y += s * 1.3;
       y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-      y = para('Switch animals with 1-4 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      y = para('Switch animals with 1-6 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
       label('Click to start', W / 2, y + Math.min(32, W / 16) * 1.5, Math.min(32, W / 16), '#ff7ad9');
     } else {
