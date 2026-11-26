@@ -18,7 +18,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
    Want more bosses? Tap 👑 Boss Rush (top left of the start screen, or press B): 60 seconds of giant bosses, one after another, each faster than the last.
    Just want to relax? Tap 🧘 Zen (or press Z): no clock, no goals, just splat for fun. A new place every 20 splats. Tap 🏠 Done when you are finished.
 9. Power-ups float down from the sky. Tap one to grab it: ⭐ double points, 💥 super poop (giant splats), or 🍱 full tummies (every animal reloaded).
-10. Earn 🏆 achievements, like beating a boss or reaching the zoo. Tap the trophy line on the start screen (or press A) to see them.
+10. Earn 🏆 achievements, like beating a boss or reaching the zoo (press A to see them). Tap 📊 Stats (or press I) for your lifetime stats: total splats, time played, favourite animal and more.
 11. Every day there is a new 📅 daily challenge (like "Splat 3 skaters") worth 30 coins, and every week a 🏅 big challenge (like "Beat 3 giant bosses") worth 100 coins.
 
 Tap **❓ Help** on the start screen (or press ?) for a how-to-play guide. Press **M** or tap the speaker to change the volume: 🔊 loud, 🔉 quiet, 🔇 off.  Press **H** or tap 🎉 for Party mode: silly hats and confetti! Press **P** or **Esc**, or tap ⏸️, to pause. The game also pauses by itself when you switch to another tab.

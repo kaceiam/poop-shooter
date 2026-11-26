@@ -234,7 +234,7 @@ const muteBtn = () => ({ x: W - 44, y: 30 });
 
 // ---- Party mode (looks only): silly hats on people and confetti on big moments ----
 // A menu (shop, help, achievements, what's new) covers the screen: hide the party button so it can't get in the way.
-const menuOpen = () => (state === 'title' || state === 'over') && (showShop || showTrophies || helpPage || showNews);
+const menuOpen = () => (state === 'title' || state === 'over') && (showShop || showTrophies || helpPage || showNews || showStats);
 const partyBtn = () => W < 600 ? { x: W - 44, y: 118 } : { x: W - 90, y: 30 };   // under the pause button on phones
 const HATS = ['🎩', '👒', '🧢', '🎓'];
 const CONFETTI_COLORS = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff9100'];
@@ -346,6 +346,7 @@ function shoot(tx, ty) {
   if (a.ammo <= 0) { hungryShake = 0.4; sfx('empty'); addText(animalPos().x, animalPos().y - 70, `Feed me ${a.foodName}!`, '#fff'); return; }
   a.ammo--;
   round.shots[a.name] = (round.shots[a.name] || 0) + 1;   // for the recap
+  life.shots[a.name] = (life.shots[a.name] || 0) + 1;
   squeeze = 0.25;
   lastShotX = tx;
   sfx('squeeze', a);
@@ -443,11 +444,13 @@ function strike(person, countsForStreak, x, y, fromCloud) {
   }
   if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss');
     if (mode === 'rush') { rushBeaten++; level++; }   // boss rush: the next boss is faster (and somewhere new)
+    life.bosses++;
   }
   if (person.dodger) { countStat('dodgers', 5, 'dodger5'); dailyEvent('dodgers'); }
   if (person.skater) dailyEvent('skaters');
   if (person.hadUmbrella) dailyEvent('umbrellas');
   dailyEvent('splat');
+  life.splats++;
   if (mode === 'zen') { zenSplats++; if (zenSplats % 20 === 0) zenNextPlace(); }   // zen: somewhere new every 20 splats
   const type = personType(person); round.types[type] = (round.types[type] || 0) + 1;
   unlock('first');
@@ -513,6 +516,38 @@ function unlock(id) {
   toast = { msg: `🏆 Achievement! ${a.icon} ${a.name}`, time: 3 };
   sfx('power');
 }
+// ---- Lifetime stats for the stats page (saved on this computer) ----
+let life = { splats: 0, games: 0, seconds: 0, shots: {}, places: [], bosses: 0, coins: 0 }, showStats = false, lifeSaveTimer = 0;
+try { life = Object.assign(life, JSON.parse(localStorage.getItem('poopLife') || '{}')); } catch (e) {}
+function saveLife() { try { localStorage.setItem('poopLife', JSON.stringify(life)); } catch (e) {} }
+function trackTime(dt) {
+  life.seconds += dt;
+  if (!life.places.includes(place().name)) life.places.push(place().name);
+  lifeSaveTimer += dt;
+  if (lifeSaveTimer > 5) { lifeSaveTimer = 0; saveLife(); }   // save every few seconds, not every frame
+}
+function playTimeText() {
+  const m = Math.floor(life.seconds / 60), h = Math.floor(m / 60);
+  if (h) return `${h} hour${h === 1 ? '' : 's'} ${m % 60} min`;
+  return m ? `${m} minute${m === 1 ? '' : 's'}` : 'Less than a minute';
+}
+function drawStats() {
+  const fav = Object.entries(life.shots).sort((a, b) => b[1] - a[1])[0];
+  const favA = fav && ANIMALS.find(a => a.name === fav[0]);
+  drawList('📊 Your stats', [
+    ['💩', 'Total splats', `${life.splats} people splatted`],
+    ['🎮', 'Games played', `${life.games}`],
+    ['⏱️', 'Time played', playTimeText()],
+    [favA ? favA.emoji : '🐾', 'Favourite animal', favA ? `${favA.name} (${fav[1]} poops)` : 'Go squeeze one!'],
+    ['🗺️', 'Places reached', `${life.places.length} of ${PLACES.length}`],
+    ['👑', 'Giant bosses beaten', `${life.bosses}`],
+    ['🪙', 'Coins earned', `${life.coins}`],
+    ['🏆', 'Achievements', `${unlocked.size} of ${ACHIEVEMENTS.length}`],
+    ['⭐', 'Best score', `${best} points · Level ${bestLevel}`],
+    ['👑', 'Best Boss Rush', `${rushBest} bosses`],
+  ], 'Tap anywhere to go back', '#1b2a10');
+}
+
 function countStat(name, need, id) { stats[name]++; saveAch(); if (stats[name] >= need) unlock(id); }
 
 // ---- Challenges: a daily one (30 coins) and a weekly big one (100 coins) ----
@@ -691,9 +726,11 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (showNews) { closeNews(); return; }
     if (showTrophies) { showTrophies = false; return; }
+    if (showStats) { showStats = false; return; }
     if (helpPage) { helpPage = helpPage < HELP_PAGES.length ? helpPage + 1 : 0; return; }   // tap for the next page
     if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop | help | achievements
-      if (p.x < W / 3) showShop = true; else if (p.x < W * 2 / 3) helpPage = 1; else showTrophies = true;
+      const q = Math.floor(p.x / (W / 4));            // shop | help | stats | achievements
+      if (q === 0) showShop = true; else if (q === 1) helpPage = 1; else if (q === 2) showStats = true; else showTrophies = true;
       return;
     }
     const rb = rushBtn();
@@ -744,15 +781,17 @@ addEventListener('keydown', e => {
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
   if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies && !helpPage) { showShop = !showShop; shopMsg = ''; }
   if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
+  if ((e.key === 'i' || e.key === 'I') && onMenu && !menuOpen()) showStats = true;
   if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
   if ((e.key === 'z' || e.key === 'Z') && onMenu && !menuOpen()) startZen();
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showNews) closeNews();
-    else if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else if (state === 'over' && mode === 'rush') startRush(); else startGame();
+    else if (showTrophies || showShop || helpPage || showStats) { showTrophies = false; showShop = false; helpPage = 0; showStats = false; } else if (state === 'over' && mode === 'rush') startRush(); else startGame();
   }
 });
 
 function startGame() {
+  life.games++; saveLife();
   mode = 'normal';
   score = 0; level = 1;
   round = { shots: {}, types: {}, bestStreak: 0 };     // fresh recap for this game
@@ -875,6 +914,7 @@ function checkDodges(dt) {
 }
 function update(dt) {
   if (paused) return;
+  if (state === 'play') trackTime(dt);                 // for the stats page
   squeeze = Math.max(0, squeeze - dt);
   chew = Math.max(0, chew - dt);
   hungryShake = Math.max(0, hungryShake - dt);
@@ -899,6 +939,7 @@ function update(dt) {
   if (timeLeft <= 0) {
     timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
     coins += score; saveShop();                        // points become coins for the shop
+    life.coins += score; saveLife();
     if (mode === 'rush') {                             // boss rush keeps its own best
       newBest = rushBeaten > rushBest;
       if (newBest) { rushBest = rushBeaten; try { localStorage.setItem('poopRushBest', rushBest); } catch (e) {} }
@@ -1482,7 +1523,7 @@ function draw() {
       const ts = Math.max(15, Math.min(20, W / 28)), maxW = Math.min(W - 32, 700);
       const short = H < 520;                           // short screens (like a sideways phone) get fewer words
       const ss = short ? Math.min(s, H / 9) : s;
-      let y = short ? H * 0.14 : H * 0.22;
+      let y = Math.max(short ? H * 0.14 : H * 0.22, 62 + ss * 0.5);   // stay below the Boss Rush and Zen buttons
       label('💩 POOP POCKET 💩', W / 2, y, ss, '#ffe14d');
       y += ss * 1.3;
       if (short) {
@@ -1519,10 +1560,13 @@ function draw() {
     const cs = Math.min(15, W / 26);                   // today's and this week's challenge, one line each
     label(daily.text(), W / 2, trophyLineY() - 54, cs, daily.done ? '#69f0ae' : '#fff', true, 'center', W - 20);
     label(weekly.text(), W / 2, trophyLineY() - 32, cs, weekly.done ? '#69f0ae' : '#ffe14d', true, 'center', W - 20);
-    label(`🛒 Shop · 🪙 ${coins}`, W / 6, trophyLineY(), fs, '#9ff');
-    label('❓ Help', W / 2, trophyLineY(), fs, '#fff');
-    label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 5 / 6, trophyLineY(), fs, '#ffe14d');
+    const narrow = W < 600;                            // phones: shorter labels so all four fit
+    label(narrow ? '🛒 Shop' : `🛒 Shop · 🪙 ${coins}`, W / 8, trophyLineY(), fs, '#9ff', true, 'center', W / 4 - 6);
+    label('❓ Help', W * 3 / 8, trophyLineY(), fs, '#fff', true, 'center', W / 4 - 6);
+    label('📊 Stats', W * 5 / 8, trophyLineY(), fs, '#c5e1a5', true, 'center', W / 4 - 6);
+    label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 7 / 8, trophyLineY(), fs, '#ffe14d', true, 'center', W / 4 - 6);
     if (helpPage) drawHelp();
+    if (showStats) drawStats();
     if (showNews && state === 'title') drawList("✨ What's new!", NEWS, 'Tap anywhere to close', '#1a1030');
     if (showTrophies) drawTrophies();
     if (showShop) drawShop();
