@@ -51,6 +51,9 @@ const PLACES = [
   { name: 'The Harbor', icon: '🏴‍☠️', sky: ['#4fc3f7', '#e1f5fe'], ground: '#a1887f', path: null,
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🦜', '🦜', '💰', '🗺️', '⚓'],
     deco: [[0.08, 0.8, '🛢️', 34], [0.9, 0.9, '🛢️', 30], [0.55, 0.95, '🪙', 22]] },
+  { name: 'Candy Town', icon: '🍭', sky: ['#f48fb1', '#fce4ec'], ground: '#f8bbd0', path: '#6d4c41',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['🍬', '🍫', '🧁', '🍩'],
+    deco: [[0.08, 0.82, '🍭', 44], [0.9, 0.85, '🍩', 34], [0.6, 0.95, '🧁', 30]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -98,6 +101,31 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'Candy Town') {
+    const top = pocketTop(), now = performance.now() / 1000;
+    const gum = ['#ef5350', '#ab47bc', '#42a5f5', '#66bb6a', '#ffca28'];             // gumdrop hills
+    for (let i = 0; i < 6; i++) {
+      const cx = (i + 0.5) * W / 6, r = hz * (0.28 + (i % 3) * 0.08);
+      ctx.fillStyle = gum[i % gum.length]; ctx.beginPath(); ctx.arc(cx, hz, r, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(cx - r * 0.35, hz - r * 0.6, r * 0.15, 0, Math.PI * 2); ctx.fill();
+    }
+    for (let i = 0; i < 5; i++) emoji('🍭', (i + 0.3) * W / 5, hz - 26, Math.min(48, hz * 0.4));   // lollipop trees
+    ctx.fillStyle = '#6d4c41'; ctx.fillRect(0, hz + 2, W, 14);                        // a chocolate river
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    for (let x = (now * 30) % 40 - 40; x < W; x += 40) ctx.fillRect(x, hz + 7, 18, 2);
+    for (let i = 0; i < 8; i++) {                                                     // candy cane posts
+      const x = (i + 0.5) * W / 8;
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 3, hz + 18, 6, 24);
+      ctx.fillStyle = '#e53935'; for (let k = 0; k < 4; k++) ctx.fillRect(x - 3, hz + 20 + k * 6, 6, 3);
+    }
+    if (!lowPower) {                                                                  // sprinkles falling like snow
+      const cols = ['#ef5350', '#42a5f5', '#ffee58', '#66bb6a', '#ab47bc'];
+      for (let i = 0; i < 24; i++) {
+        const x = (i * 71) % W + Math.sin(now + i) * 10, y = (now * (30 + (i % 4) * 8) + i * 43) % top;
+        ctx.fillStyle = cols[i % cols.length]; ctx.fillRect(x, y, 6, 2);
+      }
+    }
+  }
   if (here.name === 'The Harbor') {
     const top = pocketTop(), now = performance.now() / 1000;
     ctx.fillStyle = '#1e88e5'; ctx.fillRect(0, hz - 50, W, 50);                      // the sea
@@ -385,5 +413,6 @@ const BOSSES = {
   'The Jungle':   ['🐊', 'Croc Boss', '👑'],
   'The Desert':   ['🦂', 'Giant Scorpion', '👑'],
   'The Harbor':   ['🦑', 'The Kraken', '🏴‍☠️'],
+  'Candy Town':   ['🧁', 'Cupcake Giant', '🍒'],
 };
 const bossLook = () => BOSSES[place().name] || ['🚶‍♂️', 'Giant boss', '👑'];
