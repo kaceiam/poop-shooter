@@ -96,9 +96,10 @@ const LEVEL_TIME = 40;
 let level = 1, levelScore = 0, bannerTime = 0;
 // Level 1 = 8 points, then +4 each level up to level 5 (24). After that only +3, to stay kid-friendly.
 const goal = () => level <= 5 ? 4 + level * 4 : 24 + (level - 5) * 3;
-const speedBoost = () => 1 + 0.18 * (level - 1);        // people get faster every level
-const crowdBoost = () => 1 + 0.25 * (level - 1);        // and there are more of them
-const dodgeChance = () => Math.min(0.45, 0.1 + 0.08 * (level - 1));   // more sneaky dodgers too
+const lvl = () => mode === 'zen' ? 1 : level;          // zen mode stays easy no matter where you are
+const speedBoost = () => 1 + 0.18 * (lvl() - 1);        // people get faster every level
+const crowdBoost = () => 1 + 0.25 * (lvl() - 1);        // and there are more of them
+const dodgeChance = () => Math.min(0.45, 0.1 + 0.08 * (lvl() - 1));   // more sneaky dodgers too
 const isBossLevel = () => level % 3 === 0;              // a giant boss on levels 3, 6, 9...
 let bossSpawned = false;
 const NOPES = ['Nope!', 'Missed me!', 'Too slow!', 'Hah!', 'Not today!'];
@@ -447,6 +448,7 @@ function strike(person, countsForStreak, x, y, fromCloud) {
   if (person.skater) dailyEvent('skaters');
   if (person.hadUmbrella) dailyEvent('umbrellas');
   dailyEvent('splat');
+  if (mode === 'zen') { zenSplats++; if (zenSplats % 20 === 0) zenNextPlace(); }   // zen: somewhere new every 20 splats
   const type = personType(person); round.types[type] = (round.types[type] || 0) + 1;
   unlock('first');
   person.hit = true;
@@ -568,7 +570,7 @@ const daily = makeChallenge({ icon: '📅', name: 'Today', doneName: 'Daily chal
   period: todayKey, reward: 30, store: 'poopDaily' });
 const weekly = makeChallenge({ icon: '🏅', name: 'This week', doneName: 'Weekly big challenge', list: WEEKLY,
   period: weekKey, reward: 100, store: 'poopWeekly' });
-function dailyEvent(kind, amount = 1) { daily.event(kind, amount); weekly.event(kind, amount); }
+function dailyEvent(kind, amount = 1) { if (mode === 'zen') return; daily.event(kind, amount); weekly.event(kind, amount); }   // zen doesn't count
 
 // ---- End-of-round recap: best combo, who you splatted most, which animal you used most ----
 let round = { shots: {}, types: {}, bestStreak: 0 };
@@ -674,6 +676,8 @@ canvas.addEventListener('pointerdown', e => {
   if (paused) { setPaused(false); return; }           // any click un-pauses
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
+  const zd = zenDoneBtn();
+  if (mode === 'zen' && state === 'play' && p.x > zd.x && p.x < zd.x + zd.w && p.y > zd.y && p.y < zd.y + zd.h) { mode = 'normal'; state = 'title'; return; }   // zen: back to the menu
   if (state === 'title' || state === 'over') {
     if (showShop) {                                   // tabs, then animals or hats; anywhere else goes back
       const tab = shopTabs.find(t => Math.abs(p.x - t.x) < 75 && p.y > 96 && p.y < 130);
@@ -694,6 +698,8 @@ canvas.addEventListener('pointerdown', e => {
     }
     const rb = rushBtn();
     if (p.x > rb.x && p.x < rb.x + rb.w && p.y > rb.y && p.y < rb.y + rb.h) { startRush(); return; }
+    const zb = zenBtn();
+    if (p.x > zb.x && p.x < zb.x + zb.w && p.y > zb.y && p.y < zb.y + zb.h) { startZen(); return; }
     if (state === 'over' && mode === 'rush') startRush(); else startGame();   // play again in the same mode
     return;
   }
@@ -739,6 +745,7 @@ addEventListener('keydown', e => {
   if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies && !helpPage) { showShop = !showShop; shopMsg = ''; }
   if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
   if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
+  if ((e.key === 'z' || e.key === 'Z') && onMenu && !menuOpen()) startZen();
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showNews) closeNews();
     else if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else if (state === 'over' && mode === 'rush') startRush(); else startGame();
@@ -767,7 +774,25 @@ function startRush() {
   spawnBoss();
   addText(W / 2, horizon() + 80, 'BOSS RUSH! Beat as many as you can!', '#ffe14d');
 }
+// ---- Zen mode: no clock, no goals, no coins, no bests. Just splat for fun. ----
+let zenSplats = 0;
+const zenBtn = () => ({ x: 188, y: 12, w: 104, h: 40 });
+const zenDoneBtn = () => ({ x: 12, y: 84, w: 104, h: 34 });
+function startZen() {
+  startGame();
+  mode = 'zen'; tut = 0; zenSplats = 0;
+  addText(W / 2, horizon() + 80, '🧘 Zen mode: no clock, just splat!', '#9ff');
+}
+function zenNextPlace() {                              // float off somewhere new
+  level += 2;
+  addText(W / 2, horizon() + 60, `${place().icon} Welcome to ${place().name}!`, '#9ff');
+  sfx('level');
+}
 function drawRushButton() {
+  const z = zenBtn();
+  ctx.fillStyle = 'rgba(79,195,247,0.9)';
+  ctx.beginPath(); ctx.roundRect(z.x, z.y, z.w, z.h, 12); ctx.fill();
+  label('🧘 Zen', z.x + z.w / 2, z.y + z.h / 2, 18, '#fff', true, 'center', z.w - 12);
   const r = rushBtn();
   ctx.fillStyle = 'rgba(255,122,217,0.9)';
   ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
@@ -869,7 +894,7 @@ function update(dt) {
     if (tut <= 2 && ANIMALS[current].ammo === 0 && poops.length === 0) tut = 3;
     if (tut === 4) { tutTimer -= dt; if (tutTimer <= 0) finishTutorial(); }
   } else {
-    timeLeft -= dt;
+    if (mode !== 'zen') timeLeft -= dt;               // zen mode has no clock
   }
   if (timeLeft <= 0) {
     timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
@@ -995,8 +1020,10 @@ function para(msg, x, y, size, color, maxW) {
 function drawHud() {
   label(`Score: ${score}`, 16, 30, 26, '#fff', true, 'left');
   const hudX = W >= 600 ? W / 2 : W - 140;
-  label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
-  if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
+  if (mode === 'zen') label('🧘 Zen', hudX, 30, 26, '#9ff');
+  else label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
+  if (mode === 'zen') label(`Splats: ${zenSplats}`, hudX, 62, 18, '#9ff');
+  else if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
   else label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
   const active = [];
   if (doubleTime > 0) active.push(`⭐ x2 ${Math.ceil(doubleTime)}s`);
@@ -1009,6 +1036,12 @@ function drawHud() {
     emoji('💩', 28 + i * 26, 64, 22);
   }
   ctx.globalAlpha = 1;
+  if (mode === 'zen' && state === 'play') {            // zen: a button to go back to the menu
+    const d = zenDoneBtn();
+    ctx.fillStyle = 'rgba(79,195,247,0.85)';
+    ctx.beginPath(); ctx.roundRect(d.x, d.y, d.w, d.h, 10); ctx.fill();
+    label('🏠 Done', d.x + d.w / 2, d.y + d.h / 2, 16, '#fff', true, 'center', d.w - 10);
+  }
 }
 
 const trophyLineY = () => H - 28;
@@ -1481,7 +1514,7 @@ function draw() {
       y = para(recapText(), W / 2, y + ts * 1.5, Math.min(16, W / 26), '#9ff', W - 24);   // what happened this round
       label('Click to play again', W / 2, Math.min(y + ts * 1.4, trophyLineY() - 82), Math.min(32, W / 16), '#ff7ad9');
     }
-    drawRushButton();                                  // 👑 Boss Rush, top left
+    drawRushButton();                                  // 👑 Boss Rush and 🧘 Zen, top left
     const fs = Math.min(18, W / 22);
     const cs = Math.min(15, W / 26);                   // today's and this week's challenge, one line each
     label(daily.text(), W / 2, trophyLineY() - 54, cs, daily.done ? '#69f0ae' : '#fff', true, 'center', W - 20);
