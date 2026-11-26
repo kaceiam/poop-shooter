@@ -266,8 +266,26 @@ function toggleParty() {
   try { localStorage.setItem('poopParty', party ? '1' : '0'); } catch (e) {}
   if (party) burst(W / 2, H * 0.3, 40);
 }
+// ---- Low-power mode: skips weather, bubbles, confetti and seasonal extras (the game plays the same) ----
+// Switch it on the pause screen (or press L). It also turns itself on if the game runs slowly for a while,
+// unless you switched it off yourself.
+let lowPower = false, lowPowerChosen = false, slowTime = 0;
+try { lowPower = localStorage.getItem('poopLowPower') === '1'; lowPowerChosen = localStorage.getItem('poopLowPower') !== null; } catch (e) {}
+function setLowPower(on, auto) {
+  lowPower = on; if (!auto) lowPowerChosen = true;
+  if (on) confetti = [];
+  try { if (!auto) localStorage.setItem('poopLowPower', on ? '1' : '0'); } catch (e) {}
+}
+function watchSpeed(dt) {
+  if (lowPower || lowPowerChosen || state !== 'play' || paused) return;
+  slowTime = dt > 1 / 30 ? slowTime + dt : Math.max(0, slowTime - dt);   // slower than 30 frames a second?
+  if (slowTime > 5) {
+    setLowPower(true, true);
+    toast = { msg: '🔋 Low power mode is on to keep things smooth', time: 3.5 };
+  }
+}
 function burst(x, y, count) {
-  if (!party) return;
+  if (!party || lowPower) return;                    // no confetti in low-power mode
   for (let i = 0; i < count && confetti.length < 250; i++) {
     const a = Math.random() * Math.PI * 2, sp = 120 + Math.random() * 260;
     confetti.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, rot: Math.random() * 6, life: 1.6 + Math.random(),
@@ -857,6 +875,8 @@ canvas.addEventListener('pointerdown', e => {
   if (paused) {                                        // paused: the photo button saves a picture, any other click un-pauses
     const ph = photoBtn();
     if (p.x > ph.x && p.x < ph.x + ph.w && p.y > ph.y && p.y < ph.y + ph.h) { takePhoto(); return; }
+    const lp = powerBtn();
+    if (p.x > lp.x && p.x < lp.x + lp.w && p.y > lp.y && p.y < lp.y + lp.h) { setLowPower(!lowPower); return; }
     setPaused(false); return;
   }
   if (state === 'duoReady') {                          // two players: tap to start the next turn (or change names)
@@ -936,6 +956,7 @@ addEventListener('keydown', e => {
   if (e.key === 'h' || e.key === 'H') toggleParty();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
   if ((e.key === 'c' || e.key === 'C') && paused) takePhoto();
+  if (e.key === 'l' || e.key === 'L') setLowPower(!lowPower);
   const onMenu = state === 'title' || state === 'over';
   if (showNews && onMenu) { closeNews(); return; }      // any key closes the What's new note
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
@@ -1745,7 +1766,10 @@ function draw() {
     const pb = photoBtn();
     ctx.fillStyle = 'rgba(255,167,38,0.95)'; ctx.beginPath(); ctx.roundRect(pb.x, pb.y, pb.w, pb.h, 12); ctx.fill();
     label('📸 Save photo (C)', pb.x + pb.w / 2, pb.y + pb.h / 2, 18, '#fff', true, 'center', pb.w - 12);
-    if (performance.now() < photoMsgUntil) label('Photo saved to your Downloads! 📸', W / 2, pb.y + pb.h + 24, Math.min(18, W / 22), '#69f0ae', true, 'center', W - 24);
+    const lp = powerBtn();                             // low-power switch
+    ctx.fillStyle = lowPower ? 'rgba(105,240,174,0.9)' : 'rgba(255,255,255,0.2)'; ctx.beginPath(); ctx.roundRect(lp.x, lp.y, lp.w, lp.h, 12); ctx.fill();
+    label(`🔋 Low power: ${lowPower ? 'on' : 'off'} (L)`, lp.x + lp.w / 2, lp.y + lp.h / 2, 16, '#fff', true, 'center', lp.w - 12);
+    if (performance.now() < photoMsgUntil) label('Photo saved to your Downloads! 📸', W / 2, lp.y + lp.h + 22, Math.min(18, W / 22), '#69f0ae', true, 'center', W - 24);
   } else if (canPause()) {
     emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
@@ -1756,6 +1780,7 @@ function draw() {
 // ---- Photo mode: pause, then save a picture of the game to your Downloads folder ----
 let photoing = false, photoMsgUntil = 0;
 const photoBtn = () => ({ x: W / 2 - 110, y: H * 0.38 + 100, w: 220, h: 44 });
+const powerBtn = () => ({ x: W / 2 - 110, y: H * 0.38 + 152, w: 220, h: 40 });
 function takePhoto() {
   photoing = true;
   draw();                                              // draw the game once without the pause screen
@@ -1775,6 +1800,7 @@ function takePhoto() {
 let last = performance.now();
 function loop(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  watchSpeed(dt);                                      // slow for a while? switch to low power
   update(dt); draw();
   requestAnimationFrame(loop);
 }

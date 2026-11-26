@@ -60,7 +60,7 @@ const place = () => PLACES[Math.floor((level - 1) / 2) % PLACES.length];
 let season = (() => { const m = new Date().getMonth(); return m === 9 ? 'fall' : m === 11 ? 'winter' : m === 1 ? 'love' : ''; })();
 const SEASON_TEXT = { fall: '🎃 Happy Halloween season!', winter: '❄️ Happy holidays!', love: "💕 Happy Valentine's month!" };
 function drawSeason(here, hz, top) {
-  if (!season) return;
+  if (!season || lowPower) return;                     // low-power mode skips the seasonal extras
   const now = performance.now() / 1000;
   if (season === 'fall') {
     emoji('🎃', 0.36 * W, hz + 0.93 * (top - hz), 34); emoji('🎃', 0.8 * W, hz + 0.97 * (top - hz), 28);
@@ -135,7 +135,7 @@ function drawPlace() {
     emoji('🐪', cx1, hz - 14, 40, true); emoji('🐫', cx1 - 50, hz - 12, 36, true);
     ctx.strokeStyle = 'rgba(255,248,225,0.6)'; ctx.lineWidth = 2;                   // sand blowing in the wind
     ctx.beginPath();                                                                 // all drawn in one go (faster)
-    for (let i = 0; i < 18; i++) {
+    if (!lowPower) for (let i = 0; i < 18; i++) {
       const y = hz + ((i * 47) % Math.max(1, top - hz)), x = (now * (160 + (i % 4) * 40) + i * 131) % (W + 80) - 40;
       ctx.moveTo(x, y); ctx.lineTo(x + 22 + (i % 3) * 10, y - 2);
     }
@@ -147,7 +147,7 @@ function drawPlace() {
     const wx = W * 0.82, ww = Math.min(60, W * 0.08);                                // waterfall
     ctx.fillStyle = '#4fc3f7'; ctx.fillRect(wx, 0, ww, hz + 20);
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
-    for (let i = 0; i < 6; i++) {
+    if (!lowPower) for (let i = 0; i < 6; i++) {
       const sx = wx + 6 + i * (ww - 12) / 5, sy = (now * 220 + i * 37) % (hz + 20);
       ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx, sy + 18); ctx.stroke();
     }
@@ -187,7 +187,7 @@ function drawPlace() {
     emoji('🚕', tx, hz + 18, 40, true); emoji('🚕', tx2, hz + 30, 36);
     ctx.strokeStyle = 'rgba(180,200,255,0.35)'; ctx.lineWidth = 1;                    // a little rain (all drawn in one go)
     ctx.beginPath();
-    for (let i = 0; i < 50; i++) {
+    if (!lowPower) for (let i = 0; i < 50; i++) {
       const x = (i * 53) % W, y = (now * 420 + i * 47) % top;
       ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 10);
     }
@@ -205,7 +205,7 @@ function drawPlace() {
     for (let i = 0; i < 8; i++) emoji('🌲', (i + 0.5) * W / 8, hz - 12, 34);
     ctx.fillStyle = '#fff';                                                           // falling snow
     ctx.beginPath();                                                                 // all drawn in one go (faster)
-    for (let i = 0; i < 40; i++) {
+    if (!lowPower) for (let i = 0; i < 40; i++) {
       const x = ((i * 61) % W + Math.sin(now + i) * 12 + W) % W, y = (now * (25 + (i % 5) * 8) + i * 37) % top;
       ctx.moveTo(x + 1.5 + (i % 3), y); ctx.arc(x, y, 1.5 + (i % 3), 0, Math.PI * 2);
     }
@@ -215,19 +215,19 @@ function drawPlace() {
     const now = performance.now() / 1000, top = pocketTop();
     ctx.fillStyle = 'rgba(79,195,247,0.35)'; ctx.fillRect(0, hz, W, top - hz);    // water over the sand
     ctx.fillStyle = 'rgba(255,255,255,0.08)';                                       // light rays from the surface
-    for (let i = 0; i < 5; i++) {
+    if (!lowPower) for (let i = 0; i < 5; i++) {
       const x = (i + 0.5) * W / 5;
       ctx.beginPath(); ctx.moveTo(x - 20, 0); ctx.lineTo(x + 20, 0); ctx.lineTo(x + 70, top); ctx.lineTo(x + 10, top); ctx.fill();
     }
     const fish = ['🐠', '🐟', '🐡', '🐠'];                                          // fish swimming by
-    fish.forEach((f, i) => {
+    if (!lowPower) fish.forEach((f, i) => {
       const dir = i % 2 ? 1 : -1, sp = 30 + i * 12;
       const x = ((now * sp * dir + i * 300) % (W + 120) + W + 120) % (W + 120) - 60;
       emoji(f, x, hz * (0.3 + i * 0.15) + Math.sin(now * 2 + i) * 6, 30 + (i % 2) * 8, dir === 1);
     });
     ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5;                 // bubbles rising
     ctx.beginPath();                                                                 // all drawn in one go (faster)
-    for (let i = 0; i < 14; i++) {
+    if (!lowPower) for (let i = 0; i < 14; i++) {
       const bx = (i * 97) % W + Math.sin(now * 2 + i) * 6, by = top - ((now * (30 + (i % 4) * 12) + i * 60) % top);
       ctx.moveTo(bx + 2 + (i % 3) * 2, by); ctx.arc(bx, by, 2 + (i % 3) * 2, 0, Math.PI * 2);
     }
