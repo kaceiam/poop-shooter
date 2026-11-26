@@ -805,7 +805,11 @@ canvas.addEventListener('pointerdown', e => {
   if (Math.hypot(p.x - m.x, p.y - m.y) < 26) { toggleMute(); return; }
   const pt = partyBtn();
   if (!menuOpen() && Math.hypot(p.x - pt.x, p.y - pt.y) < 22) { toggleParty(); return; }
-  if (paused) { setPaused(false); return; }           // any click un-pauses
+  if (paused) {                                        // paused: the photo button saves a picture, any other click un-pauses
+    const ph = photoBtn();
+    if (p.x > ph.x && p.x < ph.x + ph.w && p.y > ph.y && p.y < ph.y + ph.h) { takePhoto(); return; }
+    setPaused(false); return;
+  }
   if (state === 'duoReady') { beginDuoTurn(); return; }   // two players: tap to start the next turn
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
@@ -872,6 +876,7 @@ addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') toggleMute();
   if (e.key === 'h' || e.key === 'H') toggleParty();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
+  if ((e.key === 'c' || e.key === 'C') && paused) takePhoto();
   const onMenu = state === 'title' || state === 'over';
   if (showNews && onMenu) { closeNews(); return; }      // any key closes the What's new note
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
@@ -1833,15 +1838,42 @@ function draw() {
     label(toast.msg, W / 2, ty + 20, Math.min(18, W / 22), '#ffe14d', false);
     ctx.globalAlpha = 1;
   }
+  if (photoing) {                                      // taking a photo: no pause screen or buttons, just a little label
+    label('💩 Poop Pocket', W - 12, H - 16, 16, '#fff', true, 'right');
+    return;
+  }
   if (paused) {
     ctx.fillStyle = 'rgba(40,20,5,0.6)'; ctx.fillRect(0, 0, W, H);
     label('⏸️ Paused', W / 2, H * 0.38, Math.min(54, W / 8), '#ffe14d');
     para('Click anywhere or press P to keep going', W / 2, H * 0.38 + 60, Math.min(22, W / 20), '#fff', W - 32);
+    const pb = photoBtn();
+    ctx.fillStyle = 'rgba(255,167,38,0.95)'; ctx.beginPath(); ctx.roundRect(pb.x, pb.y, pb.w, pb.h, 12); ctx.fill();
+    label('📸 Save photo (C)', pb.x + pb.w / 2, pb.y + pb.h / 2, 18, '#fff', true, 'center', pb.w - 12);
+    if (performance.now() < photoMsgUntil) label('Photo saved to your Downloads! 📸', W / 2, pb.y + pb.h + 24, Math.min(18, W / 22), '#69f0ae', true, 'center', W - 24);
   } else if (canPause()) {
     emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
   emoji(['🔇', '🔉', '🔊'][volume], muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
   if (!menuOpen()) { ctx.globalAlpha = party ? 1 : 0.4; emoji('🎉', partyBtn().x, partyBtn().y, 28); ctx.globalAlpha = 1; }   // hidden behind menus
+}
+
+// ---- Photo mode: pause, then save a picture of the game to your Downloads folder ----
+let photoing = false, photoMsgUntil = 0;
+const photoBtn = () => ({ x: W / 2 - 110, y: H * 0.38 + 100, w: 220, h: 44 });
+function takePhoto() {
+  photoing = true;
+  draw();                                              // draw the game once without the pause screen
+  photoing = false;
+  canvas.toBlob(blob => {
+    if (!blob) return;
+    const a = document.createElement('a');             // a download link: the browser saves it, nothing opens
+    a.href = URL.createObjectURL(blob);
+    a.download = `poop-pocket-${new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }, 'image/png');
+  photoMsgUntil = performance.now() + 2500;
+  sfx('magic');
 }
 
 let last = performance.now();
