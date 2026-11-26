@@ -59,6 +59,9 @@ const PLACES = [
   { name: 'The Carnival', icon: '🎪', sky: ['#7e57c2', '#f8bbd0'], ground: '#d8b98a', path: '#c49a6c',
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['🍭', '🌭', '🧸', '🎈', '🍦'],
     deco: [[0.08, 0.8, '🎯', 30], [0.88, 0.85, '🍿', 30], [0.5, 0.95, '🎠', 44]] },
+  { name: 'The Mall', icon: '🛍️', indoor: true, sky: ['#e8dcc8', '#f6efe4'], ground: '#dcdfe3', path: null,
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🛍️', '🛍️', '🛍️', '🥤', '🎁'],
+    deco: [[0.5, 0.88, '⛲', 56], [0.08, 0.8, '🪴', 34], [0.92, 0.8, '🪴', 34]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -348,6 +351,7 @@ const ACHIEVEMENTS = [
   { id: 'school',  icon: '🏫', name: 'Back to school',  how: 'Reach the school' },
   { id: 'zoo',     icon: '🦁', name: 'Zoo trip',        how: 'Reach the zoo' },
   { id: 'carnival', icon: '🎪', name: 'Carnival fun',   how: 'Reach the carnival' },
+  { id: 'mall',    icon: '🛍️', name: 'Shop till you drop', how: 'Reach the mall' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -565,7 +569,7 @@ function finishTutorial() {
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
@@ -836,10 +840,31 @@ function drawPlace() {
   const sky = ctx.createLinearGradient(0, 0, 0, hz);
   sky.addColorStop(0, here.sky[0]); sky.addColorStop(1, here.sky[1]);
   ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hz);
-  emoji('☀️', W * 0.8, 92, 50);
-  emoji('☁️', W * 0.25, 50, 50); emoji('☁️', W * 0.6, 80, 40);
+  if (!here.indoor) {                                  // no sun or clouds inside the mall
+    emoji('☀️', W * 0.8, 92, 50);
+    emoji('☁️', W * 0.25, 50, 50); emoji('☁️', W * 0.6, 80, 40);
+  }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The Mall') {
+    const top = pocketTop();
+    ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 2;                       // floor tiles
+    for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x, hz); ctx.lineTo(x, top); ctx.stroke(); }
+    for (let y = hz + 40; y < top; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    const sh = Math.min(100, hz * 0.7), count = Math.max(3, Math.floor(W / 180)), sw = W / count;
+    const signs = ['👗', '👟', '🍕', '🎮', '🧸', '📚'], colors = ['#ef9a9a', '#90caf9', '#ffcc80', '#ce93d8', '#a5d6a7', '#fff59d'];
+    for (let i = 0; i < count; i++) {                                              // shop fronts
+      const x = i * sw + 8;
+      ctx.fillStyle = colors[i % colors.length]; ctx.fillRect(x, hz - sh, sw - 16, sh);
+      ctx.fillStyle = '#cfe8ff'; ctx.fillRect(x + 8, hz - sh * 0.62, sw - 32, sh * 0.62);   // shop window
+      emoji(signs[i % signs.length], x + (sw - 16) / 2, hz - sh * 0.8, Math.min(30, sh * 0.32));
+    }
+    const ex = W * 0.7, eh = sh * 0.95;                                            // escalator
+    ctx.fillStyle = '#9e9e9e';
+    ctx.beginPath(); ctx.moveTo(ex, hz); ctx.lineTo(ex + 34, hz); ctx.lineTo(ex + 34 + eh * 0.8, hz - eh); ctx.lineTo(ex + eh * 0.8, hz - eh); ctx.fill();
+    ctx.strokeStyle = '#616161'; ctx.lineWidth = 2;
+    for (let k = 0.1; k < 1; k += 0.12) { ctx.beginPath(); ctx.moveTo(ex + eh * 0.8 * k, hz - eh * k); ctx.lineTo(ex + 34 + eh * 0.8 * k, hz - eh * k); ctx.stroke(); }
+  }
   if (here.name === 'The Park') {
     for (let i = 0; i < 7; i++) emoji('🌳', (i + 0.5) * W / 7, hz - 10, 55);
   } else if (here.name === 'The Beach') {
