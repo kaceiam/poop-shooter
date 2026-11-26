@@ -215,14 +215,17 @@ const ui = () => Math.max(0.6, Math.min(1, W / 900, H / 700));   // 1 = full siz
 const horizon = () => H * 0.28;
 const animalPos = () => { const u = ui(); return { x: Math.max(85 * u + 10, Math.min(W * 0.2, 170)), y: H - 95 * u }; };
 const bowlPos = () => { const u = ui(); return { x: W - Math.max(65 * u + 15, Math.min(W * 0.18, 150)), y: H - 80 * u }; };
-// On narrow screens (phones) the animal buttons go in two rows so they stay big enough to tap.
-const twoRows = () => W < 600 && (W - 16) / ANIMALS.length - 8 < 40;
-const perRow = () => twoRows() ? Math.ceil(ANIMALS.length / 2) : ANIMALS.length;
-const btnSize = () => Math.min(56 * Math.max(ui(), 0.8), twoRows() ? 52 : W / 9, (W - 16) / perRow() - 8);   // all buttons fit
+// Animal buttons: on wide screens they sit between the animal and the food bowl (in two rows if one
+// row won't fit there). On phones they go above, in two rows so they stay big enough to tap.
 const BTN_GAP = 8;
 const gapLeft = () => animalPos().x + 85 * ui();       // right edge of the pocket hole
 const gapRight = () => bowlPos().x - 65 * ui();        // left edge of the bowl
-const buttonsFit = () => gapRight() - gapLeft() > ANIMALS.length * (btnSize() + BTN_GAP) + 20;
+const baseBtn = () => Math.min(56 * Math.max(ui(), 0.8), W / 9);
+const fitsInGap = count => gapRight() - gapLeft() > count * (baseBtn() + BTN_GAP) + 20;
+const twoRows = () => W < 600 ? (W - 16) / ANIMALS.length - 8 < 40 : !fitsInGap(ANIMALS.length);
+const perRow = () => twoRows() ? Math.ceil(ANIMALS.length / 2) : ANIMALS.length;
+const btnSize = () => Math.min(baseBtn(), twoRows() ? 52 : W / 9, (W - 16) / perRow() - 8);   // all buttons fit
+const buttonsFit = () => W >= 600 && fitsInGap(perRow()) && 12 + (twoRows() ? 2 : 1) * (btnSize() + BTN_GAP) <= 200 * ui();
 // If the buttons don't fit between the animal and the bowl, the pocket gets taller and they go on top.
 const pocketTop = () => H - 200 * ui() - (buttonsFit() ? 0 : (btnSize() + 16) + (twoRows() ? btnSize() + BTN_GAP : 0));
 function buttonRects() {
