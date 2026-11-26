@@ -315,11 +315,13 @@ const BTN_GAP = 8;
 const gapLeft = () => animalPos().x + 85 * ui();       // right edge of the pocket hole
 const gapRight = () => bowlPos().x - 65 * ui();        // left edge of the bowl
 const baseBtn = () => Math.min(56 * Math.max(ui(), 0.8), W / 9);
-const fitsInGap = count => gapRight() - gapLeft() > count * (baseBtn() + BTN_GAP) + 20;
+const gapBtn = count => (gapRight() - gapLeft() - 20) / count - BTN_GAP;   // button size if this many fit in the gap
+const fitsInGap = count => gapBtn(count) >= Math.min(34, baseBtn());     // buttons may shrink a little to fit
 const twoRows = () => W < 600 ? (W - 16) / ANIMALS.length - 8 < 40 : !fitsInGap(ANIMALS.length);
 const perRow = () => twoRows() ? Math.ceil(ANIMALS.length / 2) : ANIMALS.length;
-const btnSize = () => Math.min(baseBtn(), twoRows() ? 52 : W / 9, (W - 16) / perRow() - 8);   // all buttons fit
-const buttonsFit = () => W >= 600 && fitsInGap(perRow()) && 12 + (twoRows() ? 2 : 1) * (btnSize() + BTN_GAP) <= 200 * ui();
+const inGapSize = () => Math.min(baseBtn(), gapBtn(perRow()));
+const buttonsFit = () => W >= 600 && fitsInGap(perRow()) && 12 + (twoRows() ? 2 : 1) * (inGapSize() + BTN_GAP) <= 200 * ui();
+const btnSize = () => buttonsFit() ? inGapSize() : Math.min(baseBtn(), twoRows() ? 52 : W / 9, (W - 16) / perRow() - 8);   // all buttons fit
 // If the buttons don't fit between the animal and the bowl, the pocket gets taller and they go on top.
 const pocketTop = () => H - 200 * ui() - (buttonsFit() ? 0 : (btnSize() + 16) + (twoRows() ? btnSize() + BTN_GAP : 0));
 function buttonRects() {
@@ -658,7 +660,7 @@ const daily = makeChallenge({ icon: '📅', name: 'Today', doneName: 'Daily chal
   period: todayKey, reward: 30, store: 'poopDaily' });
 const weekly = makeChallenge({ icon: '🏅', name: 'This week', doneName: 'Weekly big challenge', list: WEEKLY,
   period: weekKey, reward: 100, store: 'poopWeekly' });
-function dailyEvent(kind, amount = 1) { if (mode === 'zen') return; daily.event(kind, amount); weekly.event(kind, amount); }   // zen doesn't count
+function dailyEvent(kind, amount = 1) { if (mode === 'zen' || mode === 'duo') return; daily.event(kind, amount); weekly.event(kind, amount); }   // zen doesn't count
 
 // ---- End-of-round recap: best combo, who you splatted most, which animal you used most ----
 let round = { shots: {}, types: {}, bestStreak: 0 };
@@ -762,6 +764,7 @@ canvas.addEventListener('pointerdown', e => {
   const pt = partyBtn();
   if (!menuOpen() && Math.hypot(p.x - pt.x, p.y - pt.y) < 22) { toggleParty(); return; }
   if (paused) { setPaused(false); return; }           // any click un-pauses
+  if (state === 'duoReady') { beginDuoTurn(); return; }   // two players: tap to start the next turn
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   const zd = zenDoneBtn();
@@ -786,11 +789,9 @@ canvas.addEventListener('pointerdown', e => {
       if (q === 0) showShop = true; else if (q === 1) helpPage = 1; else if (q === 2) showStats = true; else showTrophies = true;
       return;
     }
-    const rb = rushBtn();
-    if (p.x > rb.x && p.x < rb.x + rb.w && p.y > rb.y && p.y < rb.y + rb.h) { startRush(); return; }
-    const zb = zenBtn();
-    if (p.x > zb.x && p.x < zb.x + zb.w && p.y > zb.y && p.y < zb.y + zb.h) { startZen(); return; }
-    if (state === 'over' && mode === 'rush') startRush(); else startGame();   // play again in the same mode
+    const mb = modeButtons().find(b => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h);
+    if (mb) { ({ rush: startRush, zen: startZen, duo: startDuo })[mb.id](); return; }   // Boss Rush, Zen or 2 Players
+    playAgain();
     return;
   }
   if (state !== 'play') return;                       // no shooting during the level banner
@@ -837,9 +838,11 @@ addEventListener('keydown', e => {
   if ((e.key === 'i' || e.key === 'I') && onMenu && !menuOpen()) showStats = true;
   if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
   if ((e.key === 'z' || e.key === 'Z') && onMenu && !menuOpen()) startZen();
+  if ((e.key === 't' || e.key === 'T') && onMenu && !menuOpen()) startDuo();
+  if ((e.key === ' ' || e.key === 'Enter') && state === 'duoReady') { beginDuoTurn(); return; }
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showNews) closeNews();
-    else if (showTrophies || showShop || helpPage || showStats) { showTrophies = false; showShop = false; helpPage = 0; showStats = false; } else if (state === 'over' && mode === 'rush') startRush(); else startGame();
+    else if (showTrophies || showShop || helpPage || showStats) { showTrophies = false; showShop = false; helpPage = 0; showStats = false; } else playAgain();
   }
 });
 
@@ -858,7 +861,21 @@ function startGame() {
 const RUSH_TIME = 60;
 let mode = 'normal', rushBeaten = 0, rushBest = 0;
 try { rushBest = +localStorage.getItem('poopRushBest') || 0; } catch (e) {}
-const rushBtn = () => ({ x: 12, y: 12, w: 168, h: 40 });
+// The mode buttons at the top left of the start and end screens (two rows on phones).
+const modeButtons = () => {
+  const list = [
+    { id: 'rush', text: '👑 Boss Rush', color: 'rgba(255,122,217,0.9)', w: 168 },
+    { id: 'zen',  text: '🧘 Zen',       color: 'rgba(79,195,247,0.9)',  w: 104 },
+    { id: 'duo',  text: '👥 2 Players', color: 'rgba(255,167,38,0.95)', w: 150 },
+  ];
+  let x = 12, y = 12;
+  for (const b of list) {
+    if (W < 600 && x + b.w > W - 70) { x = 12; y += 48; }   // wrap to a second row on narrow screens
+    Object.assign(b, { x, y, h: 40 }); x += b.w + 8;
+  }
+  return list;
+};
+const rushBtn = () => modeButtons()[0];
 function startRush() {
   startGame();
   mode = 'rush'; tut = 0; rushBeaten = 0;
@@ -868,7 +885,7 @@ function startRush() {
 }
 // ---- Zen mode: no clock, no goals, no coins, no bests. Just splat for fun. ----
 let zenSplats = 0;
-const zenBtn = () => ({ x: 188, y: 12, w: 104, h: 40 });
+const zenBtn = () => modeButtons()[1];
 const zenDoneBtn = () => ({ x: 12, y: 84, w: 104, h: 34 });
 function startZen() {
   startGame();
@@ -880,15 +897,34 @@ function zenNextPlace() {                              // float off somewhere ne
   addText(W / 2, horizon() + 60, `${place().icon} Welcome to ${place().name}!`, '#9ff');
   sfx('level');
 }
-function drawRushButton() {
-  const z = zenBtn();
-  ctx.fillStyle = 'rgba(79,195,247,0.9)';
-  ctx.beginPath(); ctx.roundRect(z.x, z.y, z.w, z.h, 12); ctx.fill();
-  label('🧘 Zen', z.x + z.w / 2, z.y + z.h / 2, 18, '#fff', true, 'center', z.w - 12);
-  const r = rushBtn();
-  ctx.fillStyle = 'rgba(255,122,217,0.9)';
-  ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
-  label('👑 Boss Rush', r.x + r.w / 2, r.y + r.h / 2, 18, '#fff', true, 'center', r.w - 12);
+function drawRushButton() {                             // draws all the mode buttons
+  for (const b of modeButtons()) {
+    ctx.fillStyle = b.color;
+    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
+    label(b.text, b.x + b.w / 2, b.y + b.h / 2, 18, '#fff', true, 'center', b.w - 12);
+  }
+}
+
+// ---- Two players on one screen: take turns, highest score wins ----
+const DUO_TIME = 30;
+let duo = null;                                         // { turn: 1 or 2, scores: [p1, p2] }
+function startDuo() { duo = { turn: 1, scores: [0, 0] }; state = 'duoReady'; }
+function beginDuoTurn() {
+  startGame();
+  mode = 'duo'; tut = 0; timeLeft = DUO_TIME;
+}
+function playAgain() {                                 // "play again" keeps the same mode
+  if (state === 'over' && mode === 'rush') startRush();
+  else if (state === 'over' && mode === 'duo') startDuo();
+  else startGame();
+}
+function drawDuoReady() {
+  ctx.fillStyle = 'rgba(40,20,5,0.75)'; ctx.fillRect(0, 0, W, H);
+  const s = Math.min(48, W / 10);
+  if (duo.turn === 2) label(`Player 1 scored ${duo.scores[0]}!`, W / 2, H * 0.28, Math.min(26, W / 16), '#fff');
+  label(`👤 Player ${duo.turn}`, W / 2, H * 0.4, s, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
+  label(duo.turn === 1 ? 'Get ready! You have 30 seconds.' : 'Your turn! Beat that score!', W / 2, H * 0.4 + s, Math.min(22, W / 20), '#fff', true, 'center', W - 24);
+  label('Tap to start', W / 2, H * 0.62, Math.min(32, W / 14), '#ff7ad9');
 }
 
 // ---- First-play tutorial. The clock waits until it's done. ----
@@ -993,6 +1029,11 @@ function update(dt) {
   }
   if (timeLeft <= 0) {
     timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
+    if (mode === 'duo') {                              // two players: end of a turn
+      duo.scores[duo.turn - 1] = score;
+      if (duo.turn === 1) { duo.turn = 2; state = 'duoReady'; sfx('level'); } else { newBest = false; sfx('level'); }
+      return;
+    }
     coins += score; saveShop();                        // points become coins for the shop
     life.coins += score; saveLife();
     if (mode === 'rush') {                             // boss rush keeps its own best
@@ -1043,7 +1084,7 @@ function update(dt) {
   }
   poops = poops.filter(p => p.t < p.dur);
   updateClouds(dt);
-  if (state === 'play' && !tut && mode !== 'rush' && levelScore >= goal()) levelUp();
+  if (state === 'play' && !tut && mode !== 'rush' && mode !== 'duo' && levelScore >= goal()) levelUp();
   for (const s of splats) {
     s.life -= dt;
     if (s.vx > 5) rollSplat(s, dt);                  // rolling down the mountain
@@ -1123,6 +1164,7 @@ function drawHud() {
   if (mode === 'zen') label('🧘 Zen', hudX, 30, 26, '#9ff');
   else label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
   if (mode === 'zen') label(`Splats: ${zenSplats}`, hudX, 62, 18, '#9ff');
+  else if (mode === 'duo') label(`👤 Player ${duo.turn}`, hudX, 62, 18, duo.turn === 1 ? '#40c4ff' : '#ff8a80');
   else if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
   else label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
   const active = [];
@@ -1580,6 +1622,7 @@ function draw() {
   if (state === 'play' || state === 'banner') drawHud();   // no score bar on the start or end screen
 
   if (state === 'play' && tut) drawTutorial();
+  if (state === 'duoReady') drawDuoReady();
   if (state === 'banner') {
     ctx.fillStyle = 'rgba(40,20,5,0.35)'; ctx.fillRect(0, 0, W, H);
     const pop = Math.min(1, (2.2 - bannerTime) * 5);                   // grows in quickly
@@ -1598,7 +1641,8 @@ function draw() {
       const ts = Math.max(15, Math.min(20, W / 28)), maxW = Math.min(W - 32, 700);
       const short = H < 520;                           // short screens (like a sideways phone) get fewer words
       const ss = short ? Math.min(s, H / 9) : s;
-      let y = Math.max(short ? H * 0.14 : H * 0.22, 62 + ss * 0.5);   // stay below the Boss Rush and Zen buttons
+      const btnBottom = Math.max(...modeButtons().map(b => b.y + b.h));
+      let y = Math.max(short ? H * 0.14 : H * 0.22, btnBottom + 10 + ss * 0.5);   // stay below the mode buttons
       label('💩 POOP POCKET 💩', W / 2, y, ss, '#ffe14d');
       y += ss * 1.3;
       if (short) {
@@ -1616,12 +1660,17 @@ function draw() {
       const short = H < 520;                           // squeeze things together on short screens
       const ts = short ? Math.min(20, W / 22) : Math.min(26, W / 18), ss = short ? Math.min(s, H / 8) : s;
       let y = short ? H * 0.2 : H * 0.28;
-      const rush = mode === 'rush';
-      label(rush ? 'BOSS RUSH OVER!' : "TIME'S UP!", W / 2, y, ss, '#ffe14d', true, 'center', W - 24);
-      const said = rush ? `You beat ${rushBeaten} giant boss${rushBeaten === 1 ? '' : 'es'}! (+${score} 🪙)`
+      const rush = mode === 'rush', two = mode === 'duo' && duo;
+      const [s1, s2] = two ? duo.scores : [0, 0];
+      const winner = two ? (s1 > s2 ? 'PLAYER 1 WINS! 🏆' : s2 > s1 ? 'PLAYER 2 WINS! 🏆' : "IT'S A TIE! 🤝") : '';
+      label(two ? winner : rush ? 'BOSS RUSH OVER!' : "TIME'S UP!", W / 2, y, ss, '#ffe14d', true, 'center', W - 24);
+      const said = two ? `👤 Player 1: ${s1} points   ·   👤 Player 2: ${s2} points`
+        : rush ? `You beat ${rushBeaten} giant boss${rushBeaten === 1 ? '' : 'es'}! (+${score} 🪙)`
         : `You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`;
       y = para(said, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
-      if (newBest) {
+      if (two) {
+        label('Want a rematch?', W / 2, y + ts * 0.4, ts, '#fff');
+      } else if (newBest) {
         const pulse = 1 + Math.sin(performance.now() / 150) * 0.06;
         label('🎉 NEW BEST! 🎉', W / 2, y + ts * 0.4, ts * 1.2 * pulse, '#ffe14d');
       } else {
