@@ -431,7 +431,9 @@ function strike(person, countsForStreak, x, y, fromCloud) {
     addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
     return true;
   }
-  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss'); }
+  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); burst(person.x, person.y - size, 60); dailyEvent('boss');
+    if (mode === 'rush') { rushBeaten++; level++; }   // boss rush: the next boss is faster (and somewhere new)
+  }
   if (person.dodger) { countStat('dodgers', 5, 'dodger5'); dailyEvent('dodgers'); }
   if (person.skater) dailyEvent('skaters');
   if (person.hadUmbrella) dailyEvent('umbrellas');
@@ -680,7 +682,10 @@ canvas.addEventListener('pointerdown', e => {
       if (p.x < W / 3) showShop = true; else if (p.x < W * 2 / 3) helpPage = 1; else showTrophies = true;
       return;
     }
-    startGame(); return;
+    const rb = rushBtn();
+    if (p.x > rb.x && p.x < rb.x + rb.w && p.y > rb.y && p.y < rb.y + rb.h) { startRush(); return; }
+    if (state === 'over' && mode === 'rush') startRush(); else startGame();   // play again in the same mode
+    return;
   }
   if (state !== 'play') return;                       // no shooting during the level banner
   if (tut && tutBox && p.x > tutBox.x && p.x < tutBox.x + tutBox.w && p.y > tutBox.y && p.y < tutBox.y + tutBox.h) {
@@ -722,19 +727,40 @@ addEventListener('keydown', e => {
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
   if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies && !helpPage) { showShop = !showShop; shopMsg = ''; }
   if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
+  if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showNews) closeNews();
-    else if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else startGame();
+    else if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else if (state === 'over' && mode === 'rush') startRush(); else startGame();
   }
 });
 
 function startGame() {
+  mode = 'normal';
   score = 0; level = 1;
   round = { shots: {}, types: {}, bestStreak: 0 };     // fresh recap for this game
   startLevel();
   let done = false;
   try { done = localStorage.getItem('poopTutorialDone') === '1'; } catch (e) {}
   tut = done ? 0 : 1;                                 // the tutorial only runs the first time
+}
+
+// ---- Boss Rush: 60 seconds of giant bosses, one after another, each one faster ----
+const RUSH_TIME = 60;
+let mode = 'normal', rushBeaten = 0, rushBest = 0;
+try { rushBest = +localStorage.getItem('poopRushBest') || 0; } catch (e) {}
+const rushBtn = () => ({ x: 12, y: 12, w: 168, h: 40 });
+function startRush() {
+  startGame();
+  mode = 'rush'; tut = 0; rushBeaten = 0;
+  timeLeft = RUSH_TIME; people = [];
+  spawnBoss();
+  addText(W / 2, horizon() + 80, 'BOSS RUSH! Beat as many as you can!', '#ffe14d');
+}
+function drawRushButton() {
+  const r = rushBtn();
+  ctx.fillStyle = 'rgba(255,122,217,0.9)';
+  ctx.beginPath(); ctx.roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill();
+  label('👑 Boss Rush', r.x + r.w / 2, r.y + r.h / 2, 18, '#fff', true, 'center', r.w - 12);
 }
 
 // ---- First-play tutorial. The clock waits until it's done. ----
@@ -836,9 +862,15 @@ function update(dt) {
   }
   if (timeLeft <= 0) {
     timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
+    coins += score; saveShop();                        // points become coins for the shop
+    if (mode === 'rush') {                             // boss rush keeps its own best
+      newBest = rushBeaten > rushBest;
+      if (newBest) { rushBest = rushBeaten; try { localStorage.setItem('poopRushBest', rushBest); } catch (e) {} }
+      sfx(newBest ? 'level' : 'end');
+      return;
+    }
     newBest = score > best && score > 0;
     sfx(newBest ? 'level' : 'end');                     // happy tune for a new best, sad tune otherwise
-    coins += score; saveShop();                        // points become coins for the shop
     dailyEvent('points', score);
     if (score > best) { best = score; try { localStorage.setItem('poopBest', best); } catch (e) {} }
     if (level > bestLevel) { bestLevel = level; try { localStorage.setItem('poopBestLevel', bestLevel); } catch (e) {} }
@@ -847,8 +879,12 @@ function update(dt) {
 
   spawnTimer -= dt;
   const busy = (1.6 - Math.min(1, (LEVEL_TIME - timeLeft) / LEVEL_TIME) * 0.6) / crowdBoost();
-  if (spawnTimer <= 0) { spawnPerson(); spawnTimer = busy * (0.6 + Math.random() * 0.8); }
-  if (isBossLevel() && !bossSpawned && !tut && timeLeft < LEVEL_TIME - 5) spawnBoss();
+  if (mode === 'rush') {
+    if (!people.some(p => p.boss && !p.hit)) spawnBoss();   // the next boss comes right away
+  } else {
+    if (spawnTimer <= 0) { spawnPerson(); spawnTimer = busy * (0.6 + Math.random() * 0.8); }
+    if (isBossLevel() && !bossSpawned && !tut && timeLeft < LEVEL_TIME - 5) spawnBoss();
+  }
   if (!tut) updatePowerups(dt);
   streakTimer = Math.max(0, streakTimer - dt);
   if (streakTimer === 0) streak = 0;
@@ -863,7 +899,7 @@ function update(dt) {
   }
   poops = poops.filter(p => p.t < p.dur);
   updateClouds(dt);
-  if (state === 'play' && !tut && levelScore >= goal()) levelUp();
+  if (state === 'play' && !tut && mode !== 'rush' && levelScore >= goal()) levelUp();
   for (const s of splats) s.life -= dt;
   splats = splats.filter(s => s.life > 0);
 }
@@ -938,7 +974,8 @@ function drawHud() {
   label(`Score: ${score}`, 16, 30, 26, '#fff', true, 'left');
   const hudX = W >= 600 ? W / 2 : W - 140;
   label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
-  label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
+  if (mode === 'rush') label(`👑 Bosses beaten: ${rushBeaten}`, hudX, 62, 18, '#ff7ad9');
+  else label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
   const active = [];
   if (doubleTime > 0) active.push(`⭐ x2 ${Math.ceil(doubleTime)}s`);
   if (superTime > 0) active.push(`💥 ${Math.ceil(superTime)}s`);
@@ -1349,7 +1386,7 @@ function draw() {
   if (drag) emoji(ANIMALS[current].food, drag.x, drag.y, 48);
   for (const t of texts) { ctx.globalAlpha = Math.min(1, t.life * 2); label(t.msg, t.x, t.y, 22, t.color); ctx.globalAlpha = 1; }
 
-  if (state !== 'title') drawHud();                    // no score bar on the start screen
+  if (state === 'play' || state === 'banner') drawHud();   // no score bar on the start or end screen
 
   if (state === 'play' && tut) drawTutorial();
   if (state === 'banner') {
@@ -1388,17 +1425,21 @@ function draw() {
       const short = H < 520;                           // squeeze things together on short screens
       const ts = short ? Math.min(20, W / 22) : Math.min(26, W / 18), ss = short ? Math.min(s, H / 8) : s;
       let y = short ? H * 0.2 : H * 0.28;
-      label("TIME'S UP!", W / 2, y, ss, '#ffe14d');
-      y = para(`You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
+      const rush = mode === 'rush';
+      label(rush ? 'BOSS RUSH OVER!' : "TIME'S UP!", W / 2, y, ss, '#ffe14d', true, 'center', W - 24);
+      const said = rush ? `You beat ${rushBeaten} giant boss${rushBeaten === 1 ? '' : 'es'}! (+${score} 🪙)`
+        : `You made it to Level ${level} and pooped on people for ${score} points (+${score} 🪙)`;
+      y = para(said, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
       if (newBest) {
         const pulse = 1 + Math.sin(performance.now() / 150) * 0.06;
         label('🎉 NEW BEST! 🎉', W / 2, y + ts * 0.4, ts * 1.2 * pulse, '#ffe14d');
       } else {
-        label(`Best: ${best} points · Level ${bestLevel}`, W / 2, y + ts * 0.4, ts, '#fff');
+        label(rush ? `Best boss rush: ${rushBest} bosses` : `Best: ${best} points · Level ${bestLevel}`, W / 2, y + ts * 0.4, ts, '#fff');
       }
       y = para(recapText(), W / 2, y + ts * 1.5, Math.min(16, W / 26), '#9ff', W - 24);   // what happened this round
       label('Click to play again', W / 2, Math.min(y + ts * 1.4, trophyLineY() - 82), Math.min(32, W / 16), '#ff7ad9');
     }
+    drawRushButton();                                  // 👑 Boss Rush, top left
     const fs = Math.min(18, W / 22);
     const cs = Math.min(15, W / 26);                   // today's and this week's challenge, one line each
     label(daily.text(), W / 2, trophyLineY() - 54, cs, daily.done ? '#69f0ae' : '#fff', true, 'center', W - 20);

@@ -15,6 +15,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
    People with umbrellas ☂️ block your first poop, and skaters 🛹 zoom by fast (worth 3).
 7. Every 2 levels you go somewhere new: 🌳 the park, then 🏖️ the beach, then 🏫 the school, then 🦁 the zoo, then 🎪 the carnival, then 🛍️ the mall, then 🚜 the farm, then 🌙 the moon (low gravity: floaty poops!), and then around again.
 8. On levels 3, 6, 9 and so on, a giant boss 👑 walks by. Hit him 3 times for 10 points!
+   Want more bosses? Tap 👑 Boss Rush (top left of the start screen, or press B): 60 seconds of giant bosses, one after another, each faster than the last.
 9. Power-ups float down from the sky. Tap one to grab it: ⭐ double points, 💥 super poop (giant splats), or 🍱 full tummies (every animal reloaded).
 10. Earn 🏆 achievements, like beating a boss or reaching the zoo. Tap the trophy line on the start screen (or press A) to see them.
 11. Every day there is a new 📅 daily challenge (like "Splat 3 skaters") worth 30 coins, and every week a 🏅 big challenge (like "Beat 3 giant bosses") worth 100 coins.
