@@ -474,12 +474,34 @@ function update(dt) {
 }
 
 // ---- Drawing ----
+// Drawing emoji is slow, so each emoji is drawn once into a little picture and reused (much faster).
+const emojiCache = new Map();
+function emojiPicture(ch, size) {
+  const key = ch + '|' + size;
+  let pic = emojiCache.get(key);
+  if (!pic) {
+    if (emojiCache.size > 500) emojiCache.clear();      // don't let it grow forever
+    pic = document.createElement('canvas');
+    pic.width = pic.height = Math.ceil(size * 1.4);
+    const c = pic.getContext('2d');
+    c.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(ch, pic.width / 2, pic.height / 2);
+    emojiCache.set(key, pic);
+  }
+  return pic;
+}
 function emoji(ch, x, y, size, flip) {
-  ctx.save(); ctx.translate(x, y);
-  if (flip) ctx.scale(-1, 1);
-  ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(ch, 0, 0); ctx.restore();
+  if (size < 2) return;
+  const pic = emojiPicture(ch, Math.max(4, Math.round(size / 2) * 2));   // sizes rounded so the cache stays small
+  const w = pic.width * (size / Math.max(4, Math.round(size / 2) * 2));
+  if (flip) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1);
+    ctx.drawImage(pic, -w / 2, -w / 2, w, w);
+    ctx.restore();
+  } else {
+    ctx.drawImage(pic, x - w / 2, y - w / 2, w, w);
+  }
 }
 function label(msg, x, y, size, color, stroke = true, align = 'center') {
   ctx.font = `bold ${size}px system-ui, sans-serif`;
