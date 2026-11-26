@@ -654,6 +654,7 @@ function drawLevelBadge(a, pos, u) {
 // ---- Lifetime stats for the stats page (saved on this computer) ----
 let life = { splats: 0, games: 0, seconds: 0, shots: {}, places: [], bosses: 0, coins: 0 }, showStats = false, lifeSaveTimer = 0;
 try { life = Object.assign(life, JSON.parse(localStorage.getItem('poopLife') || '{}')); } catch (e) {}
+if (!Array.isArray(life.days)) life.days = [];         // which days you played, for the streak calendar
 function saveLife() { try { localStorage.setItem('poopLife', JSON.stringify(life)); } catch (e) {} }
 function trackTime(dt) {
   life.seconds += dt;
@@ -680,7 +681,44 @@ function drawStats() {
     ['🏆', 'Achievements', `${unlocked.size} of ${ACHIEVEMENTS.length}`],
     ['⭐', 'Best score', `${best} points · Level ${bestLevel}`],
     ['👑', 'Best Boss Rush', `${rushBest} bosses`],
-  ], 'Tap anywhere to go back', '#1b2a10');
+  ], 'Tap to see your play calendar 📅', '#1b2a10');
+}
+
+// ---- Streak calendar: which days you played (the second page of stats) ----
+const dayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;   // same style as todayKey
+function streaks() {
+  const days = new Set(life.days);
+  let current = 0;
+  for (const d = new Date(); days.has(dayKey(d)); d.setDate(d.getDate() - 1)) current++;   // days in a row up to today
+  let best = 0, run = 0;
+  const sorted = [...days].map(k => { const [y, m, dd] = k.split('-').map(Number); return new Date(y, m - 1, dd); }).sort((a, b) => a - b);
+  for (let i = 0; i < sorted.length; i++) {
+    const gap = i ? Math.round((sorted[i] - sorted[i - 1]) / 86400000) : 1;
+    run = gap === 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+  }
+  return { current, best: Math.max(best, current) };
+}
+function drawCalendar() {
+  ctx.fillStyle = '#1b2a10'; ctx.fillRect(0, 0, W, H);
+  const { current, best } = streaks();
+  label('📅 Your play calendar', W / 2, 40, Math.min(30, W / 13), '#ffe14d');
+  label(`🔥 Streak: ${current} day${current === 1 ? '' : 's'} in a row   ·   Best: ${best}`, W / 2, 76, Math.min(18, W / 24), '#fff', true, 'center', W - 24);
+  const days = new Set(life.days), today = new Date();
+  const start = new Date(today); start.setDate(today.getDate() - today.getDay() - 28);   // 5 weeks, starting on a Sunday
+  const cell = Math.min(52, (W - 24) / 7, (H - 170) / 6), x0 = W / 2 - cell * 3.5, y0 = 104;
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((n, i) => label(n, x0 + cell * (i + 0.5), y0 + cell * 0.3, Math.min(15, cell * 0.35), '#c5e1a5', false));
+  for (let i = 0; i < 35; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const x = x0 + (i % 7) * cell, y = y0 + cell * 0.6 + Math.floor(i / 7) * cell;
+    const played = days.has(dayKey(d)), isToday = dayKey(d) === dayKey(today), future = d > today;
+    ctx.fillStyle = played ? 'rgba(105,240,174,0.35)' : future ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.roundRect(x + 3, y + 3, cell - 6, cell - 6, 8); ctx.fill();
+    if (isToday) { ctx.strokeStyle = '#ffe14d'; ctx.lineWidth = 2; ctx.stroke(); }
+    label(String(d.getDate()), x + 10, y + 13, Math.min(12, cell * 0.25), future ? '#556' : '#ddd', false, 'left');
+    if (played) emoji('💩', x + cell / 2, y + cell * 0.58, cell * 0.42);
+  }
+  label('Tap anywhere to go back', W / 2, H - 26, Math.min(16, W / 24), '#ff7ad9');
 }
 
 function countStat(name, need, id) { stats[name]++; saveAch(); if (stats[name] >= need) unlock(id); }
@@ -867,11 +905,11 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (showNews) { closeNews(); return; }
     if (showTrophies) { showTrophies = false; return; }
-    if (showStats) { showStats = false; return; }
+    if (showStats) { showStats = showStats === 1 ? 2 : 0; return; }   // stats, then the calendar, then close
     if (helpPage) { helpPage = helpPage < HELP_PAGES.length ? helpPage + 1 : 0; return; }   // tap for the next page
     if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop | help | achievements
       const q = Math.floor(p.x / (W / 4));            // shop | help | stats | achievements
-      if (q === 0) showShop = true; else if (q === 1) helpPage = 1; else if (q === 2) showStats = true; else showTrophies = true;
+      if (q === 0) showShop = true; else if (q === 1) helpPage = 1; else if (q === 2) showStats = 1; else showTrophies = true;
       return;
     }
     const mb = modeButtons().find(b => p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h);
@@ -921,7 +959,7 @@ addEventListener('keydown', e => {
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
   if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies && !helpPage) { showShop = !showShop; shopMsg = ''; }
   if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
-  if ((e.key === 'i' || e.key === 'I') && onMenu && !menuOpen()) showStats = true;
+  if ((e.key === 'i' || e.key === 'I') && onMenu && !menuOpen()) showStats = 1;
   if ((e.key === 'b' || e.key === 'B') && onMenu && !menuOpen()) startRush();
   if ((e.key === 'z' || e.key === 'Z') && onMenu && !menuOpen()) startZen();
   if ((e.key === 't' || e.key === 'T') && onMenu && !menuOpen()) startDuo();
@@ -933,7 +971,10 @@ addEventListener('keydown', e => {
 });
 
 function startGame() {
-  life.games++; saveLife();
+  life.games++;
+  if (!Array.isArray(life.days)) life.days = [];
+  if (!life.days.includes(todayKey)) { life.days.push(todayKey); if (life.days.length > 400) life.days.shift(); }   // played today!
+  saveLife();
   mode = 'normal';
   score = 0; level = 1;
   round = { shots: {}, types: {}, bestStreak: 0 };     // fresh recap for this game
@@ -1889,7 +1930,7 @@ function draw() {
     label('📊 Stats', W * 5 / 8, trophyLineY(), fs, '#c5e1a5', true, 'center', W / 4 - 6);
     label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 7 / 8, trophyLineY(), fs, '#ffe14d', true, 'center', W / 4 - 6);
     if (helpPage) drawHelp();
-    if (showStats) drawStats();
+    if (showStats === 1) drawStats(); else if (showStats === 2) drawCalendar();
     if (showNews && state === 'title') drawList("✨ What's new!", NEWS, 'Tap anywhere to close', '#1a1030');
     if (showTrophies) drawTrophies();
     if (showShop) drawShop();
