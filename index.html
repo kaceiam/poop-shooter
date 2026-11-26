@@ -121,6 +121,11 @@ function toggleMute() {
 }
 function selectAnimal(i) { if (i !== current) { current = i; sfx('switch'); } }
 const muteBtn = () => ({ x: W - 44, y: 30 });
+const pauseBtn = () => ({ x: W - 44, y: 74 });
+let paused = false;
+const canPause = () => state === 'play' || state === 'banner';
+function setPaused(v) { if (!canPause()) return; paused = v; drag = null; }
+document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });   // pause when you switch away
 
 // ---- Layout helpers (the pocket shrinks to fit small screens like phones) ----
 const ui = () => Math.max(0.6, Math.min(1, W / 900, H / 700));   // 1 = full size
@@ -232,6 +237,9 @@ canvas.addEventListener('pointerdown', e => {
   const p = pointer(e);
   const m = muteBtn();
   if (Math.hypot(p.x - m.x, p.y - m.y) < 26) { toggleMute(); return; }
+  if (paused) { setPaused(false); return; }           // any click un-pauses
+  const pb = pauseBtn();
+  if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   if (state === 'title' || state === 'over') { startGame(); return; }
   if (state !== 'play') return;                       // no shooting during the level banner
   const rects = buttonRects();
@@ -259,6 +267,7 @@ addEventListener('keydown', e => {
   const n = parseInt(e.key);
   if (n >= 1 && n <= ANIMALS.length) selectAnimal(n - 1);
   if (e.key === 'm' || e.key === 'M') toggleMute();
+  if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
   if ((e.key === ' ' || e.key === 'Enter') && (state === 'title' || state === 'over')) startGame();
 });
 
@@ -319,6 +328,7 @@ function checkDodges(dt) {
   }
 }
 function update(dt) {
+  if (paused) return;
   squeeze = Math.max(0, squeeze - dt);
   chew = Math.max(0, chew - dt);
   hungryShake = Math.max(0, hungryShake - dt);
@@ -486,7 +496,7 @@ function draw() {
   for (const t of texts) { ctx.globalAlpha = Math.min(1, t.life * 2); label(t.msg, t.x, t.y, 22, t.color); ctx.globalAlpha = 1; }
 
   label(`Score: ${score}`, 16, 30, 26, '#fff', true, 'left');
-  const hudX = W >= 600 ? W / 2 : W - 115;
+  const hudX = W >= 600 ? W / 2 : W - 140;
   label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
   label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
   const a = ANIMALS[current];                                          // poop left in your animal
@@ -528,6 +538,13 @@ function draw() {
       label(`Best: ${best}`, W / 2, y + ts * 0.5, ts, '#fff');
       label('Click to play again', W / 2, y + ts * 3, Math.min(32, W / 16), '#ff7ad9');
     }
+  }
+  if (paused) {
+    ctx.fillStyle = 'rgba(40,20,5,0.6)'; ctx.fillRect(0, 0, W, H);
+    label('⏸️ Paused', W / 2, H * 0.38, Math.min(54, W / 8), '#ffe14d');
+    para('Click anywhere or press P to keep going', W / 2, H * 0.38 + 60, Math.min(22, W / 20), '#fff', W - 32);
+  } else if (canPause()) {
+    emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
   emoji(muted ? '🔇' : '🔊', muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
 }

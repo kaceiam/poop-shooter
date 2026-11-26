@@ -12,7 +12,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 6. Watch out for sneaky people! They hop out of the way of small poops (bird, dog), but they can't escape the big splats (cow, elephant). They're worth 2, and there are more of them every level.
 7. Every 2 levels you go somewhere new: 🌳 the park, then 🏖️ the beach, then 🏫 the school, and then around again.
 
-Press **M** or click the speaker to mute.
+Press **M** or click the speaker to mute. Press **P** or **Esc**, or tap ⏸️, to pause. The game also pauses by itself when you switch to another tab.
 
 ## The animals
 
