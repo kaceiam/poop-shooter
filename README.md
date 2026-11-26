@@ -18,7 +18,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 10. Earn 🏆 achievements, like beating a boss or reaching the zoo. Tap the trophy line on the start screen (or press A) to see them.
 11. Every day there is a new 📅 daily challenge (like "Splat 3 skaters"). Finish it for 30 bonus coins.
 
-Press **M** or click the speaker to mute.  Press **H** or tap 🎉 for Party mode: silly hats and confetti! Press **P** or **Esc**, or tap ⏸️, to pause. The game also pauses by itself when you switch to another tab.
+Tap **❓ Help** on the start screen (or press ?) for a how-to-play guide. Press **M** or click the speaker to mute.  Press **H** or tap 🎉 for Party mode: silly hats and confetti! Press **P** or **Esc**, or tap ⏸️, to pause. The game also pauses by itself when you switch to another tab.
 
 ## The animals
 

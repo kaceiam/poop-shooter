@@ -41,6 +41,11 @@ const ANIMALS = [
     price: 100, shopText: 'Drops a line of 4 poops from the sky' },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
+// What each animal does, for the help screen (shop animals use their shopText).
+const ABOUT = {
+  Bird: 'Small, fast poops', Dog: 'Medium splats', Cow: 'Big splats', Elephant: 'Huge, slow splats',
+  Monkey: 'Throws 3 poops at once', Unicorn: 'Magic poop follows a person', Skunk: 'Stink cloud splats walkers',
+};
 
 // ---- Places: the place changes every 2 levels ----
 // people: full-body emoji only. props: things they carry (only some people carry one).
@@ -549,8 +554,9 @@ canvas.addEventListener('pointerdown', e => {
       return;
     }
     if (showTrophies) { showTrophies = false; return; }
-    if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop on the left, achievements on the right
-      if (p.x < W / 2) showShop = true; else showTrophies = true;
+    if (helpPage) { helpPage = helpPage < HELP_PAGES.length ? helpPage + 1 : 0; return; }   // tap for the next page
+    if (Math.abs(p.y - trophyLineY()) < 22) {          // bottom row: shop | help | achievements
+      if (p.x < W / 3) showShop = true; else if (p.x < W * 2 / 3) helpPage = 1; else showTrophies = true;
       return;
     }
     startGame(); return;
@@ -591,8 +597,9 @@ addEventListener('keydown', e => {
   const onMenu = state === 'title' || state === 'over';
   if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop) showTrophies = !showTrophies;
   if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies) { showShop = !showShop; shopMsg = ''; }
+  if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
-    if (showTrophies || showShop) { showTrophies = false; showShop = false; } else startGame();
+    if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else startGame();
   }
 });
 
@@ -769,9 +776,15 @@ function emoji(ch, x, y, size, flip) {
     ctx.drawImage(pic, x - w / 2, y - w / 2, w, w);
   }
 }
-function label(msg, x, y, size, color, stroke = true, align = 'center') {
+// maxW (optional): squeeze the text so it's never wider than this.
+function label(msg, x, y, size, color, stroke = true, align = 'center', maxW = 0) {
   ctx.font = `bold ${size}px system-ui, sans-serif`;
   ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (maxW) {
+    if (stroke) { ctx.lineWidth = 5; ctx.strokeStyle = '#3a2410'; ctx.strokeText(msg, x, y, maxW); }
+    ctx.fillStyle = color; ctx.fillText(msg, x, y, maxW);
+    return;
+  }
   if (stroke) { ctx.lineWidth = 5; ctx.strokeStyle = '#3a2410'; ctx.strokeText(msg, x, y); }
   ctx.fillStyle = color; ctx.fillText(msg, x, y);
 }
@@ -842,6 +855,53 @@ function drawShop() {
   if (shopMsg) para(shopMsg, W / 2, H - 62, Math.min(18, W / 22), '#ffe14d', W - 32);
   label('Tap an animal to buy it · tap anywhere else to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
 }
+// ---- How to play: 4 pages, tap to go to the next one ----
+let helpPage = 0;                                      // 0 = closed, 1-4 = which page
+const HELP_PAGES = [
+  { title: '🐾 The animals', rows: () => ANIMALS.map(a => [a.emoji, `${a.name} · eats ${a.foodName}` + (a.price ? ` · 🪙 ${a.price}` : ''),
+      (ABOUT[a.name] || a.shopText) + ` · ${a.maxAmmo} poops`]) },
+  { title: '🚶 The people', rows: () => [
+      ['🚶', 'Walkers', 'Easy targets · 1 point'],
+      ['🏃', 'Runners', 'Fast! Aim ahead of them · 3 points'],
+      ['💨', 'Sneaky people', 'Dodge small poops. Use a big animal! · 2 points'],
+      ['☂️', 'Umbrella people', 'The first poop bounces off · 2 points'],
+      ['🛹', 'Skaters', 'Zoom by super fast · 3 points'],
+      ['👑', 'Giant boss', 'Every 3 levels. Hit him 3 times · 10 points'],
+    ] },
+  { title: '⭐ Power-ups and tips', rows: () => [
+      ['⭐', 'Double points', 'Every point counts twice for 8 seconds'],
+      ['💥', 'Super poop', 'Giant splats for 8 seconds'],
+      ['🍱', 'Full tummies', 'Every animal is fed right away'],
+      ['🔥', 'Combo', 'Hit again within 2 seconds for x2, then x3'],
+      ['🪙', 'Coins', 'Your points become coins for the shop'],
+      ['📅', 'Daily challenge', 'A new one every day, worth 30 coins'],
+    ] },
+  { title: '🗺️ The places', rows: () => PLACES.map((pl, i) => [pl.icon, pl.name, `Levels ${i * 2 + 1}-${i * 2 + 2}`])
+      .concat([['🔁', 'And around again!', 'Reach each goal before time runs out']]) },
+];
+function drawHelp() {
+  const page = HELP_PAGES[helpPage - 1];
+  drawList(page.title, page.rows(), `Page ${helpPage}/${HELP_PAGES.length} · tap for ${helpPage < HELP_PAGES.length ? 'the next page' : 'done'}`, '#10202a');
+}
+// A full-screen list of [icon, name, line] rows; two columns on short wide screens.
+function drawList(title, rows, footer, bg) {
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  label(title, W / 2, 46, Math.min(32, W / 12), '#ffe14d');
+  const cols = (H - 140) / rows.length < 40 && W > 600 ? 2 : 1;
+  const perCol = Math.ceil(rows.length / cols);
+  const rowH = Math.min(54, (H - 140) / perCol), fs = Math.min(18, W / 24 / cols * 1.4, rowH * 0.42);
+  const colW = W / cols;
+  rows.forEach(([icon, name, line], i) => {
+    const col = Math.floor(i / perCol), left = col * colW + Math.max(14, colW / 2 - (cols === 2 ? 170 : 230));
+    const y = 96 + (i % perCol) * rowH;
+    emoji(icon, left + 16, y, Math.min(30, rowH * 0.7));
+    const room = colW - (left - col * colW) - 52;                 // squeeze long lines so they fit
+    label(name, left + 42, y - fs * 0.45, fs, '#fff', true, 'left', room);
+    label(line, left + 42, y + fs * 0.6, fs * 0.78, '#ccc', false, 'left', room);
+  });
+  label(footer, W / 2, H - 28, Math.min(16, W / 24), '#ff7ad9');
+}
+
 function drawTrophies() {
   ctx.fillStyle = '#1e1205'; ctx.fillRect(0, 0, W, H);
   // Short screens show two columns so the rows don't squash together.
@@ -1134,8 +1194,10 @@ function draw() {
     }
     const fs = Math.min(18, W / 22);
     para(dailyText(), W / 2, trophyLineY() - 34, Math.min(16, W / 25), daily.done ? '#69f0ae' : '#fff', W - 24);
-    label(`🛒 Shop · 🪙 ${coins}`, W * 0.27, trophyLineY(), fs, '#9ff');
-    label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 0.73, trophyLineY(), fs, '#ffe14d');
+    label(`🛒 Shop · 🪙 ${coins}`, W / 6, trophyLineY(), fs, '#9ff');
+    label('❓ Help', W / 2, trophyLineY(), fs, '#fff');
+    label(`🏆 ${unlocked.size}/${ACHIEVEMENTS.length}`, W * 5 / 6, trophyLineY(), fs, '#ffe14d');
+    if (helpPage) drawHelp();
     if (showTrophies) drawTrophies();
     if (showShop) drawShop();
   }
