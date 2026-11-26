@@ -229,9 +229,40 @@ function buy(a) {
   sfx('power');
 }
 
+// ---- People react to the animal in your pocket ----
+// scared: they run faster for a bit. curious: they stop to look (easy target!). gross: they slow down.
+const REACTIONS = {
+  Bird:     ['curious', ['Tweet tweet! 🐦', 'Is that a bird?']],
+  Dog:      ['curious', ['Good doggy! 🐶', 'Aww, a puppy!']],
+  Cow:      ['scared',  ['Moo-ve away! 🐮', 'A COW?!']],
+  Elephant: ['scared',  ['RUN! 🐘', "It's HUGE!"]],
+  Monkey:   ['curious', ['Ha ha, a monkey! 🐒', 'Ooh ooh ah ah!']],
+  Unicorn:  ['curious', ['Ooh, a unicorn! 🦄', 'So pretty!']],
+  Skunk:    ['gross',   ["What's that smell? 🤢", 'Pee-yew!']],
+  Duck:     ['curious', ['Quack? 🦆', 'A duck!']],
+  Bat:      ['scared',  ['A BAT! 🦇', 'Eek!']],
+  Penguin:  ['curious', ['Aww, a penguin! 🐧', 'So cute!']],
+  Octopus:  ['scared',  ['Tentacles?! 🐙', 'Run!']],
+  Kangaroo: ['curious', ['Is that a kangaroo? 🦘', 'Boing?']],
+};
+let reactTimer = 5;
+function reactTo(a, count) {
+  const r = REACTIONS[a.name];
+  if (!r) return;
+  const who = people.filter(p => !p.hit && !p.boss && !(p.frozen > 0) && p.x > 40 && p.x < W - 40)
+    .sort(() => Math.random() - 0.5).slice(0, count);
+  for (const p of who) {
+    const size = 70 * p.scale;
+    if (r[0] === 'scared') { p.moodMul = 1.7; p.moodTime = 2; }
+    else if (r[0] === 'gross') { p.moodMul = 0.45; p.moodTime = 2.5; }
+    else p.pause = Math.max(p.pause || 0, 1.3);
+    addText(p.x, p.y - size - 18, r[1][Math.floor(Math.random() * r[1].length)], r[0] === 'scared' ? '#ffcc80' : r[0] === 'gross' ? '#c5e1a5' : '#fff');
+  }
+}
+
 function selectAnimal(i) {
   if (!isOwned(ANIMALS[i])) { addText(W / 2, pocketTop() - 40, `🔒 Get the ${ANIMALS[i].name} in the shop!`, '#ffe14d'); sfx('empty'); return; }
-  if (i !== current) { current = i; sfx('switch'); }
+  if (i !== current) { current = i; sfx('switch'); if (state === 'play') reactTo(ANIMALS[i], 2); }   // people notice your new animal
 }
 const muteBtn = () => ({ x: W - 44, y: 30 });
 
@@ -878,6 +909,7 @@ function finishTutorial() {
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
+  reactTimer = 5;
   const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
@@ -906,7 +938,8 @@ function movePeople(dt) {
     } else if (p.pause > 0) {
       p.pause -= dt;
     } else {
-      p.x += p.dir * p.speed * dt;
+      p.x += p.dir * p.speed * dt * (p.moodTime > 0 ? p.moodMul : 1);   // scared people run, grossed-out people slow down
+      if (p.moodTime > 0) p.moodTime -= dt;
       p.bob += dt * (p.hit ? 18 : 8);
     }
   }
@@ -985,6 +1018,7 @@ function update(dt) {
     if (isBossLevel() && !bossSpawned && !tut && timeLeft < LEVEL_TIME - 5) spawnBoss();
   }
   if (!tut) updatePowerups(dt);
+  if (!tut && (reactTimer -= dt) <= 0) { reactTo(ANIMALS[current], 1); reactTimer = 6 + Math.random() * 4; }   // every few seconds someone notices your animal
   streakTimer = Math.max(0, streakTimer - dt);
   if (streakTimer === 0) streak = 0;
 
