@@ -48,7 +48,12 @@ const PLACES = [
   { name: 'The School', icon: '🏫', sky: ['#90caf9', '#e3f2fd'], ground: '#a7adb3', path: '#f2c14e',
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🎒', '🎒', '🎒', '📚', '🍎'],
     deco: [[0.12, 0.8, '⚽', 26], [0.85, 0.7, '🏀', 26]] },
+  { name: 'The Zoo', icon: '🦁', sky: ['#81d4fa', '#e1f5fe'], ground: '#8bc96a', path: '#d9c08a',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🎈', '🎈', '🎈', '🍿', '🪣', '🍌'],
+    deco: [[0.1, 0.82, '🌿', 30], [0.9, 0.78, '🪨', 30], [0.55, 0.92, '🦩', 40]] },
 ];
+const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
+let lastShotX = 0;                                       // zoo animals turn to watch where you shot
 const place = () => PLACES[Math.floor((level - 1) / 2) % PLACES.length];
 const YUCKS = ['EWW!', 'GROSS!', 'NOOO!', 'MY SHIRT!', 'YUCK!', 'WHY?!', 'EW EW EW'];
 // ---- Levels: reach the goal before time runs out to go to the next level ----
@@ -196,6 +201,7 @@ function shoot(tx, ty) {
   if (a.ammo <= 0) { hungryShake = 0.4; sfx('empty'); addText(animalPos().x, animalPos().y - 70, `Feed me ${a.foodName}!`, '#fff'); return; }
   a.ammo--;
   squeeze = 0.25;
+  lastShotX = tx;
   sfx('squeeze', a);
   const start = animalPos();
   const dist = Math.hypot(tx - start.x, ty - start.y);
@@ -583,6 +589,18 @@ function drawPlace() {
       ctx.fillRect(x, hz - bh * 0.84, 30, bh * 0.25); ctx.fillRect(x, hz - bh * 0.47, 30, bh * 0.25);
     }
     ctx.fillStyle = '#6d4c41'; ctx.fillRect(W / 2 - 25, hz - bh * 0.58, 50, bh * 0.58);   // door
+  }
+  if (here.name === 'The Zoo') {
+    const ch = Math.min(90, hz * 0.65), cw = 110, count = Math.max(2, Math.floor(W / 150));
+    for (let i = 0; i < count; i++) {
+      const cx = (i + 0.5) * W / count;
+      ctx.fillStyle = '#e8d9b0'; ctx.fillRect(cx - cw / 2, hz - ch, cw, ch);         // inside the cage
+      const who = ZOO_ANIMALS[i % ZOO_ANIMALS.length];
+      emoji(who, cx, hz - ch * 0.4, ch * 0.6, lastShotX > cx);                     // watching your poop
+      ctx.fillStyle = '#555';
+      for (let x = cx - cw / 2; x <= cx + cw / 2; x += 14) ctx.fillRect(x, hz - ch, 3, ch);   // bars
+      ctx.fillRect(cx - cw / 2 - 3, hz - ch - 6, cw + 6, 7);
+    }
   }
   if (here.path) {
     ctx.fillStyle = here.path;
