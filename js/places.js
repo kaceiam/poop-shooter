@@ -48,6 +48,9 @@ const PLACES = [
   { name: 'The Desert', icon: '🏜️', sky: ['#ff8f00', '#ffe082'], ground: '#e9c46a', path: null,
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['📷', '📷', '🗺️', '🧃'],
     deco: [[0.08, 0.82, '🌵', 46], [0.62, 0.95, '🌵', 36], [0.92, 0.88, '🦂', 22]] },
+  { name: 'The Harbor', icon: '🏴‍☠️', sky: ['#4fc3f7', '#e1f5fe'], ground: '#a1887f', path: null,
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🦜', '🦜', '💰', '🗺️', '⚓'],
+    deco: [[0.08, 0.8, '🛢️', 34], [0.9, 0.9, '🛢️', 30], [0.55, 0.95, '🪙', 22]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -95,6 +98,32 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The Harbor') {
+    const top = pocketTop(), now = performance.now() / 1000;
+    ctx.fillStyle = '#1e88e5'; ctx.fillRect(0, hz - 50, W, 50);                      // the sea
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; ctx.beginPath();   // waves
+    for (let x = 0; x <= W; x += 16) ctx.lineTo(x, hz - 44 + Math.sin(x / 25 + now * 2) * 3);
+    ctx.stroke();
+    const sx = W * 0.6, s = Math.min(1.1, hz / 175);                                  // the pirate ship, rocking on the waves
+    ctx.save(); ctx.translate(sx, hz - 30); ctx.rotate(Math.sin(now * 1.3) * 0.05); ctx.scale(s, s);
+    ctx.fillStyle = '#5d4037';
+    ctx.beginPath(); ctx.moveTo(-110, -10); ctx.lineTo(110, -10); ctx.lineTo(85, 22); ctx.lineTo(-85, 22); ctx.fill();   // hull
+    ctx.fillStyle = '#3e2723'; ctx.fillRect(-3, -110, 6, 100);                       // mast
+    ctx.fillStyle = '#fafafa';
+    ctx.beginPath(); ctx.moveTo(4, -100); ctx.quadraticCurveTo(55, -70, 4, -30); ctx.fill();   // sails
+    ctx.beginPath(); ctx.moveTo(-4, -95); ctx.quadraticCurveTo(-45, -70, -4, -40); ctx.fill();
+    for (let i = -2; i <= 2; i++) { ctx.fillStyle = '#212121'; ctx.beginPath(); ctx.arc(i * 35, 4, 5, 0, Math.PI * 2); ctx.fill(); }   // cannon holes
+    ctx.restore();
+    emoji('🏴‍☠️', sx + 4 * s, hz - 30 - 122 * s, 26);
+    ctx.fillStyle = '#6d4c41';                                                        // the wooden dock
+    for (let y = hz + 14; y < top; y += 22) ctx.fillRect(0, y, W, 2);
+    for (const fx of [0.25, 0.75]) {                                                  // cannons on the dock
+      const cx = fx * W, cy = hz + 26;
+      ctx.fillStyle = '#263238'; ctx.save(); ctx.translate(cx, cy); ctx.rotate(-0.25); ctx.fillRect(-4, -8, 42, 16); ctx.restore();
+      ctx.fillStyle = '#4e342e'; ctx.beginPath(); ctx.arc(cx + 4, cy + 8, 9, 0, Math.PI * 2); ctx.fill();
+    }
+    emoji('🕊️', ((now * 50) % (W + 100)) - 50, hz * 0.3 + Math.sin(now * 2) * 8, 26);   // a seagull
+  }
   if (here.name === 'The Desert') {
     const top = pocketTop(), now = performance.now() / 1000;
     for (const [fx, fs] of [[0.22, 0.9], [0.5, 1.15], [0.74, 0.75]]) {             // pyramids (light side and shady side)

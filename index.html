@@ -559,6 +559,7 @@ const ACHIEVEMENTS = [
   { id: 'jungle',  icon: '🌴', name: 'Jungle explorer', how: 'Reach the jungle' },
   { id: 'desert',  icon: '🏜️', name: 'Pyramid explorer', how: 'Reach the desert' },
   { id: 'golden',  icon: '🌟', name: 'Golden splat', how: 'Splat a rare golden person' },
+  { id: 'harbor',  icon: '🏴‍☠️', name: 'Ahoy!', how: 'Reach the pirate harbor' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -1030,7 +1031,7 @@ function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
   reactTimer = 5;
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city', 'The Jungle': 'jungle', 'The Desert': 'desert' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city', 'The Jungle': 'jungle', 'The Desert': 'desert', 'The Harbor': 'harbor' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
