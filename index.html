@@ -219,6 +219,7 @@ function land(p) {
     }
   }
   if (hits) sfx('eww');
+  if (hits && tut === 1) tut = 2;
   if (hits >= 2) { addPoints(hits); addText(p.tx, p.ty - 80, `COMBO x${hits}!`, '#ff7ad9'); }
 }
 
@@ -229,6 +230,7 @@ function feed() {
   a.ammo = Math.min(a.maxAmmo, a.ammo + a.perFood);
   chew = 0.6;
   sfx('nom');
+  if (tut === 3) { tut = 4; tutTimer = 4; }
   addText(animalPos().x, animalPos().y - 70, 'nom nom!', '#fff');
 }
 
@@ -246,6 +248,9 @@ canvas.addEventListener('pointerdown', e => {
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   if (state === 'title' || state === 'over') { startGame(); return; }
   if (state !== 'play') return;                       // no shooting during the level banner
+  if (tut && tutBox && p.x > tutBox.x && p.x < tutBox.x + tutBox.w && p.y > tutBox.y && p.y < tutBox.y + tutBox.h) {
+    finishTutorial(); return;                         // tapping the tip box skips the tutorial
+  }
   const rects = buttonRects();
   for (let i = 0; i < rects.length; i++) {
     const r = rects[i];
@@ -278,6 +283,25 @@ addEventListener('keydown', e => {
 function startGame() {
   score = 0; level = 1;
   startLevel();
+  let done = false;
+  try { done = localStorage.getItem('poopTutorialDone') === '1'; } catch (e) {}
+  tut = done ? 0 : 1;                                 // the tutorial only runs the first time
+}
+
+// ---- First-play tutorial. The clock waits until it's done. ----
+// 1 = shoot someone, 2 = use up your poop, 3 = feed your animal, 4 = switch animals
+let tut = 0, tutTimer = 0, tutBox = null;
+const TUT_TEXT = {
+  1: '👆 Click on a person to squeeze your animal and shoot poop at them!',
+  2: 'Splat! 💩 Keep shooting until you run out of poop.',
+  3: 'Your animal is hungry! Drag the food from the bowl to its mouth.',
+  4: 'Switch animals with these buttons. Big animals make big splats!',
+};
+function finishTutorial() {
+  tut = 0; tutBox = null;
+  try { localStorage.setItem('poopTutorialDone', '1'); } catch (e) {}
+  addText(W / 2, horizon() + 60, 'GO! The clock is running!', '#ffe14d');
+  sfx('level');
 }
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0;
@@ -346,7 +370,12 @@ function update(dt) {
   }
   if (state !== 'play') return;
 
-  timeLeft -= dt;
+  if (tut) {
+    if (tut <= 2 && ANIMALS[current].ammo === 0 && poops.length === 0) tut = 3;
+    if (tut === 4) { tutTimer -= dt; if (tutTimer <= 0) finishTutorial(); }
+  } else {
+    timeLeft -= dt;
+  }
   if (timeLeft <= 0) {
     timeLeft = 0; state = 'over'; drag = null; sfx('end');
     if (score > best) { best = score; try { localStorage.setItem('poopBest', best); } catch (e) {} }
@@ -366,7 +395,7 @@ function update(dt) {
     if (p.t >= p.dur) land(p);
   }
   poops = poops.filter(p => p.t < p.dur);
-  if (state === 'play' && levelScore >= goal()) levelUp();
+  if (state === 'play' && !tut && levelScore >= goal()) levelUp();
   for (const s of splats) s.life -= dt;
   splats = splats.filter(s => s.life > 0);
 }
@@ -385,8 +414,8 @@ function label(msg, x, y, size, color, stroke = true, align = 'center') {
   if (stroke) { ctx.lineWidth = 5; ctx.strokeStyle = '#3a2410'; ctx.strokeText(msg, x, y); }
   ctx.fillStyle = color; ctx.fillText(msg, x, y);
 }
-// Writes a sentence over several lines if it's too wide for the screen. Returns where it ended.
-function para(msg, x, y, size, color, maxW) {
+// Splits a sentence into lines that fit the screen.
+function wrapLines(msg, size, maxW) {
   ctx.font = `bold ${size}px system-ui, sans-serif`;
   const lines = [''];
   for (const word of msg.split(' ')) {
@@ -394,8 +423,41 @@ function para(msg, x, y, size, color, maxW) {
     if (ctx.measureText(tryLine).width > maxW && lines[lines.length - 1]) lines.push(word);
     else lines[lines.length - 1] = tryLine;
   }
+  return lines;
+}
+// Writes a sentence over several lines if it's too wide for the screen. Returns where it ended.
+function para(msg, x, y, size, color, maxW) {
+  const lines = wrapLines(msg, size, maxW);
   lines.forEach((l, i) => label(l, x, y + i * size * 1.3, size, color));
   return y + lines.length * size * 1.3;
+}
+
+function drawTutorial() {
+  const size = Math.min(20, Math.max(15, W / 30)), boxW = Math.min(W - 24, 560);
+  const lines = wrapLines(TUT_TEXT[tut], size, boxW - 30);
+  const boxH = lines.length * size * 1.3 + 34, bx = W / 2 - boxW / 2;
+  const by = Math.max(88, horizon() - boxH - 6);          // up in the sky if there's room, so it doesn't cover people
+  tutBox = { x: bx, y: by, w: boxW, h: boxH };
+  ctx.fillStyle = 'rgba(30,15,5,0.82)';
+  ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 14); ctx.fill();
+  ctx.strokeStyle = '#ffe14d'; ctx.lineWidth = 3; ctx.stroke();
+  para(TUT_TEXT[tut], W / 2, by + 14 + size * 0.6, size, '#fff', boxW - 30);
+  label('tap here to skip ⏭', bx + boxW - 12, by + boxH - 11, 12, '#ffe14d', false, 'right');
+
+  const bob = Math.sin(performance.now() / 180) * 8;
+  if (tut === 1) {                                     // point at a person
+    const ok = q => !q.hit && q.x > 60 && q.x < W - 60;
+    const p = people.find(q => ok(q) && q.y - 70 * q.scale > by + boxH) || people.find(ok);   // someone not behind the box
+    if (p) emoji('👆', p.x, p.y + 22 + bob, 34);
+  } else if (tut === 3) {                              // show the food going from the bowl to the mouth
+    const b = bowlPos(), a = animalPos(), k = (performance.now() / 1400) % 1;
+    const x = b.x + (a.x - b.x) * k, y = b.y + (a.y - 20 - b.y) * k - Math.sin(k * Math.PI) * 60;
+    ctx.globalAlpha = 0.75;
+    emoji(ANIMALS[current].food, x, y, 40); emoji('👆', x + 14, y + 30, 30);
+    ctx.globalAlpha = 1;
+  } else if (tut === 4) {                              // point at the animal buttons
+    for (const r of buttonRects()) emoji('👇', r.x + r.w / 2, r.y - 22 + bob, 24);
+  }
 }
 
 function drawPlace() {
@@ -511,6 +573,7 @@ function draw() {
   }
   ctx.globalAlpha = 1;
 
+  if (state === 'play' && tut) drawTutorial();
   if (state === 'banner') {
     ctx.fillStyle = 'rgba(40,20,5,0.35)'; ctx.fillRect(0, 0, W, H);
     const pop = Math.min(1, (2.2 - bannerTime) * 5);                   // grows in quickly
