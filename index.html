@@ -585,10 +585,15 @@ function emojiPicture(ch, size) {
   }
   return pic;
 }
+// Sizes are rounded to steps about 12% apart, so a shrinking poop reuses a few pictures
+// instead of making a new one every frame.
+const STEP = Math.log(1.12);
+const sizeStep = size => Math.max(4, Math.round(Math.exp(Math.round(Math.log(size) / STEP) * STEP)));
 function emoji(ch, x, y, size, flip) {
   if (size < 2) return;
-  const pic = emojiPicture(ch, Math.max(4, Math.round(size / 2) * 2));   // sizes rounded so the cache stays small
-  const w = pic.width * (size / Math.max(4, Math.round(size / 2) * 2));
+  const base = sizeStep(size);
+  const pic = emojiPicture(ch, base);
+  const w = pic.width * (size / base);
   if (flip) {
     ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1);
     ctx.drawImage(pic, -w / 2, -w / 2, w, w);
