@@ -616,8 +616,8 @@ addEventListener('keydown', e => {
   if (e.key === 'h' || e.key === 'H') toggleParty();
   if (e.key === 'p' || e.key === 'P' || e.key === 'Escape') setPaused(!paused);
   const onMenu = state === 'title' || state === 'over';
-  if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop) showTrophies = !showTrophies;
-  if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies) { showShop = !showShop; shopMsg = ''; }
+  if ((e.key === 'a' || e.key === 'A') && onMenu && !showShop && !helpPage) showTrophies = !showTrophies;
+  if ((e.key === 's' || e.key === 'S') && onMenu && !showTrophies && !helpPage) { showShop = !showShop; shopMsg = ''; }
   if (e.key === '?' && onMenu && !showShop && !showTrophies) helpPage = helpPage ? 0 : 1;
   if ((e.key === ' ' || e.key === 'Enter') && onMenu) {
     if (showTrophies || showShop || helpPage) { showTrophies = false; showShop = false; helpPage = 0; } else startGame();
