@@ -32,6 +32,8 @@ const ANIMALS = [
   // Special animals: the monkey throws 3 at once, the unicorn's magic poop follows a person.
   { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3 },
   { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true },
+  // The skunk's poop leaves a stink cloud that splats anyone who walks into it.
+  { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
@@ -229,6 +231,7 @@ function shoot(tx, ty) {
 
 function land(p) {
   splats.push({ x: p.tx, y: p.ty, size: p.size, life: 4, magic: !!ANIMALS[p.animal].homing });
+  if (ANIMALS[p.animal].stink) clouds.push({ x: p.tx, y: p.ty, r: 60, life: 3, got: new Set() });   // skunk!
   sfx('splat');
   let hits = 0;
   for (const person of people) {
@@ -237,27 +240,51 @@ function land(p) {
     const bodyY = person.y - size * 0.45;
     if (Math.abs(person.x - p.tx) < size * 0.4 + p.size * 0.4 &&
         Math.abs(bodyY - p.ty) < size * 0.55 + p.size * 0.3) {
-      if (!hits) bumpStreak(p.tx, p.ty);              // first hit of this poop counts toward the streak
-      if (person.boss && person.hp > 1) {              // the boss needs 3 hits
-        person.hp--; person.flash = 0.3; hits++;
-        addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
-        continue;
-      }
-      if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); }
-      if (person.dodger) countStat('dodgers', 5, 'dodger5');
-      unlock('first');
-      person.hit = true;
-      person.dir = person.x < W / 2 ? -1 : 1;        // run off the nearest side
-      person.speed = 320; person.dodgeTime = 0; person.pause = 0;
+      strike(person, !hits, p.tx, p.ty);
       hits++;
-      const got = addPoints(person.points * (person.boss ? 1 : Math.min(3, streak)));   // boss is always 10
-      addText(person.x, person.y - size - 10, YUCKS[Math.floor(Math.random() * YUCKS.length)], '#fff');
-      addText(person.x, person.y - size - 40, '+' + got, '#ffe14d');
     }
   }
   if (hits) sfx('eww');
-  if (hits && tut === 1) tut = 2;
   if (hits >= 2) { addPoints(hits); addText(p.tx, p.ty - 110, `${hits} AT ONCE!`, '#9ff'); }
+}
+
+// What happens when poop (or a stink cloud) gets someone.
+function strike(person, countsForStreak, x, y) {
+  const size = 70 * person.scale;
+  if (countsForStreak) bumpStreak(x, y);
+  if (tut === 1) tut = 2;
+  if (person.boss && person.hp > 1) {                  // the boss needs 3 hits
+    person.hp--; person.flash = 0.3;
+    addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
+    return;
+  }
+  if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); unlock('boss'); }
+  if (person.dodger) countStat('dodgers', 5, 'dodger5');
+  unlock('first');
+  person.hit = true;
+  person.dir = person.x < W / 2 ? -1 : 1;              // run off the nearest side
+  person.speed = 320; person.dodgeTime = 0; person.pause = 0;
+  const got = addPoints(person.points * (person.boss ? 1 : Math.min(3, streak)));   // boss is always 10
+  addText(person.x, person.y - size - 10, YUCKS[Math.floor(Math.random() * YUCKS.length)], '#fff');
+  addText(person.x, person.y - size - 40, '+' + got, '#ffe14d');
+}
+
+// Skunk stink clouds hang around for a few seconds. Anyone who walks in gets splatted (once per cloud).
+let clouds = [];
+function updateClouds(dt) {
+  for (const c of clouds) {
+    c.life -= dt;
+    for (const person of people) {
+      if (person.hit || c.got.has(person)) continue;
+      const bodyY = person.y - 70 * person.scale * 0.45;
+      if (Math.hypot(person.x - c.x, (bodyY - c.y) * 1.5) < c.r + 20 * person.scale) {
+        c.got.add(person);
+        strike(person, true, c.x, c.y);
+        sfx('eww');
+      }
+    }
+  }
+  clouds = clouds.filter(c => c.life > 0);
 }
 
 // ---- Achievements: saved on this computer, shown on the start screen ----
@@ -435,7 +462,7 @@ function finishTutorial() {
 }
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
-  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0;
+  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
   const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo' }[place().name];
   if (placeId) unlock(placeId);
   people = []; poops = []; splats = []; texts = [];
@@ -534,6 +561,7 @@ function update(dt) {
     if (p.t >= p.dur) land(p);
   }
   poops = poops.filter(p => p.t < p.dur);
+  updateClouds(dt);
   if (state === 'play' && !tut && levelScore >= goal()) levelUp();
   for (const s of splats) s.life -= dt;
   splats = splats.filter(s => s.life > 0);
@@ -767,6 +795,15 @@ function draw() {
     emoji(POWERS[pu.kind].emoji, pu.x, pu.y + bob, 36);
     if (landed) label('tap!', pu.x, pu.y + 38, 14, '#fff');
   }
+  for (const c of clouds) {                            // green stink clouds
+    ctx.globalAlpha = Math.min(0.55, c.life * 0.5);
+    ctx.fillStyle = '#8bc34a';
+    const wob = Math.sin(performance.now() / 250 + c.x) * 5;
+    ctx.beginPath(); ctx.ellipse(c.x, c.y, c.r + wob, (c.r + wob) * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = Math.min(1, c.life);
+    emoji('💨', c.x - 25, c.y - 15 + wob, 30); emoji('💨', c.x + 25, c.y + 5 - wob, 26, true);
+    ctx.globalAlpha = 1;
+  }
   for (const p of poops) drawPoopFlying(p);
   drawPocket();
   if (drag) emoji(ANIMALS[current].food, drag.x, drag.y, 48);
@@ -810,7 +847,7 @@ function draw() {
       y += s * 1.3;
       y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-      y = para('Switch animals with 1-6 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      y = para('Switch animals with 1-7 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
       label('Click to start', W / 2, y + Math.min(32, W / 16) * 1.5, Math.min(32, W / 16), '#ff7ad9');
       if (best > 0) label(`Your best: ${best} points · Level ${bestLevel}`, W / 2, y + Math.min(32, W / 16) * 3, Math.min(18, W / 22), '#fff');
