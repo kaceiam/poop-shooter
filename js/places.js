@@ -14,7 +14,7 @@ const PLACES = [
     deco: [[0.08, 0.85, '🌷', 30], [0.9, 0.15, '🌼', 26], [0.6, 0.9, '🌷', 28]] },
   { name: 'The Beach', icon: '🏖️', sky: ['#4fc3f7', '#e1f5fe'], ground: '#f4dca0', path: null,
     people: ['🚶', '🚶‍♀️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🏄', '🏄‍♀️', '🤸', '🤸‍♀️'], props: ['🍦', '🏐', '🛟', '🍉'],
-    deco: [[0.06, 0.2, '🌴', 70], [0.94, 0.25, '🌴', 70], [0.3, 0.75, '⛱️', 50], [0.5, 0.15, '🐚', 24]] },
+    deco: [[0.06, 0.2, '🌴', 70], [0.94, 0.25, '🌴', 70], [0.3, 0.75, '⛱️', 50], [0.75, 0.85, '🏰', 40], [0.5, 0.15, '🐚', 24]] },
   { name: 'The School', icon: '🏫', sky: ['#90caf9', '#e3f2fd'], ground: '#a7adb3', path: '#f2c14e',
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🎒', '🎒', '🎒', '📚', '🍎'],
     deco: [[0.12, 0.8, '⚽', 26], [0.85, 0.7, '🏀', 26]] },
@@ -213,6 +213,13 @@ function drawPlace() {
     }
     const tx = ((now * 160) % (W + 200)) - 100, tx2 = W - ((now * 120 + 300) % (W + 200)) + 100;   // taxis
     emoji('🚕', tx, hz + 18, 40, true); emoji('🚕', tx2, hz + 30, 36);
+    ctx.strokeStyle = 'rgba(180,200,255,0.35)'; ctx.lineWidth = 1;                    // a little rain (all drawn in one go)
+    ctx.beginPath();
+    if (!lowPower) for (let i = 0; i < 50; i++) {
+      const x = (i * 53) % W, y = (now * 420 + i * 47) % top;
+      ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 10);
+    }
+    ctx.stroke();
   }
   if (here.name === 'The Mountain') {
     const top = pocketTop(), now = performance.now() / 1000;
