@@ -54,7 +54,8 @@ const YUCKS = ['EWW!', 'GROSS!', 'NOOO!', 'MY SHIRT!', 'YUCK!', 'WHY?!', 'EW EW 
 // ---- Levels: reach the goal before time runs out to go to the next level ----
 const LEVEL_TIME = 40;
 let level = 1, levelScore = 0, bannerTime = 0;
-const goal = () => 5 + level * 3;                       // level 1 = 8 points, level 2 = 11, ...
+// Level 1 = 8 points, then +3 each level up to level 5 (20). After that only +2, to stay kid-friendly.
+const goal = () => level <= 5 ? 5 + level * 3 : 20 + (level - 5) * 2;
 const speedBoost = () => 1 + 0.18 * (level - 1);        // people get faster every level
 const crowdBoost = () => 1 + 0.25 * (level - 1);        // and there are more of them
 const dodgeChance = () => Math.min(0.45, 0.1 + 0.08 * (level - 1));   // more sneaky dodgers too
