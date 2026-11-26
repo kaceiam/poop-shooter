@@ -13,6 +13,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 7. Every 2 levels you go somewhere new: 🌳 the park, then 🏖️ the beach, then 🏫 the school, then 🦁 the zoo, and then around again.
 8. On levels 3, 6, 9 and so on, a giant boss 👑 walks by. Hit him 3 times for 10 points!
 9. Power-ups float down from the sky. Tap one to grab it: ⭐ double points, 💥 super poop (giant splats), or 🍱 full tummies (every animal reloaded).
+10. Earn 🏆 achievements, like beating a boss or reaching the zoo. Tap the trophy line on the start screen (or press A) to see them.
 
 Press **M** or click the speaker to mute. Press **P** or **Esc**, or tap ⏸️, to pause. The game also pauses by itself when you switch to another tab.
 
