@@ -58,6 +58,8 @@ const goal = () => 5 + level * 3;                       // level 1 = 8 points, l
 const speedBoost = () => 1 + 0.18 * (level - 1);        // people get faster every level
 const crowdBoost = () => 1 + 0.25 * (level - 1);        // and there are more of them
 const dodgeChance = () => Math.min(0.45, 0.1 + 0.08 * (level - 1));   // more sneaky dodgers too
+const isBossLevel = () => level % 3 === 0;              // a giant boss on levels 3, 6, 9...
+let bossSpawned = false;
 const NOPES = ['Nope!', 'Missed me!', 'Too slow!', 'Hah!', 'Not today!'];
 
 let current = 0;
@@ -113,6 +115,7 @@ function sfx(kind, animal) {
   if (kind === 'eww')    tone('square', 560, 240, 0.4, 0.07);
   if (kind === 'nom')    { tone('sine', 300, 450, 0.08, 0.3); tone('sine', 300, 450, 0.08, 0.3, 0.15); }
   if (kind === 'empty')  tone('triangle', 300, 140, 0.3, 0.25);
+  if (kind === 'boss')   { tone('sawtooth', 110, 98, 0.5, 0.12); tone('sawtooth', 82, 73, 0.6, 0.12, 0.45); }
   if (kind === 'magic')  [880, 1175, 1568].forEach((f, i) => tone('sine', f, f * 1.02, 0.15, 0.08, i * 0.06));
   if (kind === 'dodge')  { noise(0.15, 3000, 0.2); tone('sine', 500, 1200, 0.12, 0.08); }
   if (kind === 'switch') tone('sine', 600, 900, 0.08, 0.15);
@@ -170,6 +173,21 @@ function spawnPerson() {
   people.sort((a, b) => a.y - b.y);                  // far people drawn first
 }
 
+// The giant boss: big, slow, takes 3 hits, worth 10 points.
+function spawnBoss() {
+  bossSpawned = true;
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  people.push({
+    x: dir === 1 ? -100 : W + 100, y: horizon() + (pocketTop() - horizon()) * 0.88,
+    scale: 2.5 * Math.max(ui(), 0.75), dir, emoji: '🚶‍♂️', prop: null,
+    speed: 45 * speedBoost(), points: 10, hit: false, bob: 0,
+    boss: true, hp: 3, flash: 0, dodger: false, dodgeTime: 0, pause: 0, cool: 0,
+  });
+  people.sort((a, b) => a.y - b.y);
+  addText(W / 2, horizon() + 40, '⚠️ GIANT BOSS! Hit him 3 times!', '#ff7ad9');
+  sfx('boss');
+}
+
 // ---- Shooting (the squeeze!) ----
 function shoot(tx, ty) {
   const a = ANIMALS[current];
@@ -209,6 +227,12 @@ function land(p) {
     const bodyY = person.y - size * 0.45;
     if (Math.abs(person.x - p.tx) < size * 0.4 + p.size * 0.4 &&
         Math.abs(bodyY - p.ty) < size * 0.55 + p.size * 0.3) {
+      if (person.boss && person.hp > 1) {              // the boss needs 3 hits
+        person.hp--; person.flash = 0.3; hits++;
+        addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
+        continue;
+      }
+      if (person.boss) { person.hp = 0; addText(W / 2, horizon() + 40, 'BOSS DOWN! 🎉', '#ffe14d'); }
       person.hit = true;
       person.dir = person.x < W / 2 ? -1 : 1;        // run off the nearest side
       person.speed = 320; person.dodgeTime = 0; person.pause = 0;
@@ -304,7 +328,7 @@ function finishTutorial() {
   sfx('level');
 }
 function startLevel() {
-  state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0;
+  state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   people = []; poops = []; splats = []; texts = [];
   ANIMALS.forEach(a => a.ammo = a.maxAmmo);
   for (let i = 0; i < 3; i++) { spawnPerson(); people[people.length - 1].x = Math.random() * W; }
@@ -319,6 +343,7 @@ function levelUp() {
 // ---- Update ----
 function movePeople(dt) {
   for (const p of people) {
+    if (p.flash) p.flash = Math.max(0, p.flash - dt);
     if (p.dodgeTime > 0) {                             // quick hop sideways
       p.x += p.dodgeDir * p.dodgeSpeed * Math.min(dt, p.dodgeTime);
       p.dodgeTime -= dt;
@@ -385,6 +410,7 @@ function update(dt) {
   spawnTimer -= dt;
   const busy = (1.6 - Math.min(1, (LEVEL_TIME - timeLeft) / LEVEL_TIME) * 0.6) / crowdBoost();
   if (spawnTimer <= 0) { spawnPerson(); spawnTimer = busy * (0.6 + Math.random() * 0.8); }
+  if (isBossLevel() && !bossSpawned && !tut && timeLeft < LEVEL_TIME - 5) spawnBoss();
 
   checkDodges(dt);
   movePeople(dt);
@@ -553,7 +579,18 @@ function draw() {
   for (const p of people) {
     const size = 70 * p.scale;
     const bob = Math.abs(Math.sin(p.bob)) * 4 * p.scale;
+    if (p.flash && Math.floor(p.flash * 20) % 2) ctx.globalAlpha = 0.4;    // the boss blinks when hit
     emoji(p.emoji, p.x, p.y - size * 0.45 - bob, size, p.dir === 1);   // emoji face left, so flip
+    ctx.globalAlpha = 1;
+    if (p.boss) {
+      const head = p.y - size * 0.95 - bob;
+      for (let i = 0; i < 3 - p.hp; i++) emoji('💩', p.x, head - i * size * 0.14, size * 0.26);   // poop pile on his head
+      if (!p.hit) {
+        emoji('👑', p.x, head - (3 - p.hp) * size * 0.14 - size * 0.08, size * 0.3);
+        for (let i = 0; i < p.hp; i++) emoji('❤️', p.x + (i - (p.hp - 1) / 2) * 20, head - size * 0.3 - (3 - p.hp) * size * 0.14, 18);
+      }
+      continue;
+    }
     if (p.prop) emoji(p.prop, p.x + p.dir * size * 0.28, p.y - size * 0.35 - bob, size * 0.38);   // what they carry
     if (p.hit) emoji('💩', p.x, p.y - size * 0.95 - bob, size * 0.45);   // poop on their head!
   }
@@ -582,7 +619,7 @@ function draw() {
     const step = Math.min(22, W / 20) * 1.5, line1 = by + Math.min(70, W / 7) * 0.85;
     label(`Level ${level}!`, W / 2, by, bs, '#ffe14d');
     label(`${place().icon} ${place().name} ${place().icon}`, W / 2, line1, Math.min(28, W / 15), '#9ff');
-    label('Faster people, and more of them!', W / 2, line1 + step * 1.1, Math.min(22, W / 20), '#fff');
+    label(isBossLevel() ? '⚠️ A giant boss is coming!' : 'Faster people, and more of them!', W / 2, line1 + step * 1.1, Math.min(22, W / 20), '#fff');
     label(`Goal: ${goal()} points`, W / 2, line1 + step * 2.1, Math.min(22, W / 20), '#fff');
   }
   if (state === 'title' || state === 'over') {
