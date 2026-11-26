@@ -626,6 +626,25 @@ function para(msg, x, y, size, color, maxW) {
   return y + lines.length * size * 1.3;
 }
 
+// The bar at the top: score, timer, level goal, active power-ups and poop left.
+function drawHud() {
+  label(`Score: ${score}`, 16, 30, 26, '#fff', true, 'left');
+  const hudX = W >= 600 ? W / 2 : W - 140;
+  label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
+  label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
+  const active = [];
+  if (doubleTime > 0) active.push(`⭐ x2 ${Math.ceil(doubleTime)}s`);
+  if (superTime > 0) active.push(`💥 ${Math.ceil(superTime)}s`);
+  if (streak >= 2) active.push(`🔥 x${Math.min(3, streak)}`);
+  if (active.length) label(active.join('  '), hudX, 90, 16, '#fff');
+  const a = ANIMALS[current];                                          // poop left in your animal
+  for (let i = 0; i < a.maxAmmo; i++) {
+    ctx.globalAlpha = i < a.ammo ? 1 : 0.2;
+    emoji('💩', 28 + i * 26, 64, 22);
+  }
+  ctx.globalAlpha = 1;
+}
+
 const trophyLineY = () => H - 28;
 function drawTrophies() {
   ctx.fillStyle = '#1e1205'; ctx.fillRect(0, 0, W, H);
@@ -814,21 +833,7 @@ function draw() {
   if (drag) emoji(ANIMALS[current].food, drag.x, drag.y, 48);
   for (const t of texts) { ctx.globalAlpha = Math.min(1, t.life * 2); label(t.msg, t.x, t.y, 22, t.color); ctx.globalAlpha = 1; }
 
-  label(`Score: ${score}`, 16, 30, 26, '#fff', true, 'left');
-  const hudX = W >= 600 ? W / 2 : W - 140;
-  label(`⏱ ${Math.ceil(timeLeft)}`, hudX, 30, 26, timeLeft < 10 ? '#ff6b6b' : '#fff');
-  label(`Level ${level} · ${Math.min(levelScore, goal())}/${goal()}`, hudX, 62, 18, '#ffe14d');
-  const active = [];
-  if (doubleTime > 0) active.push(`⭐ x2 ${Math.ceil(doubleTime)}s`);
-  if (superTime > 0) active.push(`💥 ${Math.ceil(superTime)}s`);
-  if (streak >= 2) active.push(`🔥 x${Math.min(3, streak)}`);
-  if (active.length) label(active.join('  '), hudX, 90, 16, '#fff');
-  const a = ANIMALS[current];                                          // poop left in your animal
-  for (let i = 0; i < a.maxAmmo; i++) {
-    ctx.globalAlpha = i < a.ammo ? 1 : 0.2;
-    emoji('💩', 28 + i * 26, 64, 22);
-  }
-  ctx.globalAlpha = 1;
+  if (state !== 'title') drawHud();                    // no score bar on the start screen
 
   if (state === 'play' && tut) drawTutorial();
   if (state === 'banner') {
@@ -847,13 +852,20 @@ function draw() {
     const s = Math.min(54, W / 11);
     if (state === 'title') {
       const ts = Math.max(15, Math.min(20, W / 28)), maxW = Math.min(W - 32, 700);
-      let y = H * 0.22;
-      label('💩 POOP POCKET 💩', W / 2, y, s, '#ffe14d');
-      y += s * 1.3;
-      y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-      y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-      y = para('Switch animals with 1-7 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      const short = H < 520;                           // short screens (like a sideways phone) get fewer words
+      const ss = short ? Math.min(s, H / 9) : s;
+      let y = short ? H * 0.14 : H * 0.22;
+      label('💩 POOP POCKET 💩', W / 2, y, ss, '#ffe14d');
+      y += ss * 1.3;
+      if (short) {
+        y = para('Click the park to shoot poop at people. Out of poop? Drag the food to your animal\'s mouth.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      } else {
+        y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+        y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+        y = para('Switch animals with 1-7 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      }
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
+      if (short) y -= Math.min(32, W / 16) * 0.5;
       label('Click to start', W / 2, y + Math.min(32, W / 16) * 1.5, Math.min(32, W / 16), '#ff7ad9');
       if (best > 0) label(`Your best: ${best} points · Level ${bestLevel}`, W / 2, y + Math.min(32, W / 16) * 3, Math.min(18, W / 22), '#fff');
     } else {
