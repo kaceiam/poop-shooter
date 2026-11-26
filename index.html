@@ -928,9 +928,10 @@ function startGame() {
   score = 0; level = 1;
   round = { shots: {}, types: {}, bestStreak: 0 };     // fresh recap for this game
   startLevel();
-  let done = false;
-  try { done = localStorage.getItem('poopTutorialDone') === '1'; } catch (e) {}
-  tut = done ? 0 : 1;                                 // the tutorial only runs the first time
+  let seen = null;
+  try { seen = localStorage.getItem('poopTutorialDone'); } catch (e) {}
+  tut = seen === '2' ? 0 : seen === '1' ? 5 : 1;       // new players get it all; old players just see the new tips
+  tutTimer = 4.5;
 }
 
 // ---- Boss Rush: 60 seconds of giant bosses, one after another, each one faster ----
@@ -1002,17 +1003,20 @@ function drawDuoReady() {
 }
 
 // ---- First-play tutorial. The clock waits until it's done. ----
-// 1 = shoot someone, 2 = use up your poop, 3 = feed your animal, 4 = switch animals
+// 1 = shoot someone, 2 = use up your poop, 3 = feed your animal, 4 = switch animals,
+// 5 = power-ups and combos, 6 = game modes and the shop (5 and 6 move on by themselves)
 let tut = 0, tutTimer = 0, tutBox = null;
 const TUT_TEXT = {
   1: '👆 Click on a person to squeeze your animal and shoot poop at them!',
   2: 'Splat! 💩 Keep shooting until you run out of poop.',
   3: 'Your animal is hungry! Drag the food from the bowl to its mouth.',
-  4: 'Switch animals with these buttons. Big animals make big splats!',
+  4: 'Switch animals with these buttons. Each animal levels up the more you use it!',
+  5: '⭐ Tap power-ups, hit people quickly for 🔥 combos, and use big animals on sneaky people!',
+  6: 'On the start screen, try 👑 Boss Rush, 🧘 Zen and 👥 2 Players, and spend coins in the 🛒 shop!',
 };
 function finishTutorial() {
   tut = 0; tutBox = null;
-  try { localStorage.setItem('poopTutorialDone', '1'); } catch (e) {}
+  try { localStorage.setItem('poopTutorialDone', '2'); } catch (e) {}
   addText(W / 2, horizon() + 60, 'GO! The clock is running!', '#ffe14d');
   sfx('level');
 }
@@ -1097,7 +1101,7 @@ function update(dt) {
 
   if (tut) {
     if (tut <= 2 && ANIMALS[current].ammo === 0 && poops.length === 0) tut = 3;
-    if (tut === 4) { tutTimer -= dt; if (tutTimer <= 0) finishTutorial(); }
+    if (tut >= 4) { tutTimer -= dt; if (tutTimer <= 0) { if (tut < 6) { tut++; tutTimer = 4.5; } else finishTutorial(); } }
   } else {
     if (mode !== 'zen') timeLeft -= dt;               // zen mode has no clock
   }
