@@ -30,10 +30,10 @@ const ANIMALS = [
   { name: 'Cow',      emoji: '🐮', food: '🌿', foodName: 'grass',   maxAmmo: 3, perFood: 1, splat: 65, speed: 0.9 },
   { name: 'Elephant', emoji: '🐘', food: '🥜', foodName: 'peanuts', maxAmmo: 2, perFood: 1, splat: 95, speed: 0.7 },
   // Special animals: the monkey throws 3 at once, the unicorn's magic poop follows a person.
-  { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3, price: 40 },
-  { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true, price: 150 },
+  { name: 'Monkey',   emoji: '🐒', food: '🍌', foodName: 'bananas', maxAmmo: 3, perFood: 1, splat: 28, speed: 1.4, spread: 3 },
+  { name: 'Unicorn',  emoji: '🦄', food: '🍓', foodName: 'strawberries', maxAmmo: 2, perFood: 1, splat: 40, speed: 0.9, homing: true },
   // The skunk's poop leaves a stink cloud that splats anyone who walks into it.
-  { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true, price: 80 },
+  { name: 'Skunk',    emoji: '🦨', food: '🐛', foodName: 'bugs', maxAmmo: 2, perFood: 1, splat: 35, speed: 1.0, stink: true },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
@@ -705,6 +705,13 @@ function drawShop() {
   label('🛒 Animal Shop', W / 2, 44, Math.min(34, W / 12), '#9ff');
   label(`You have 🪙 ${coins} coins`, W / 2, 82, Math.min(20, W / 20), '#ffe14d');
   const list = ANIMALS.filter(a => a.price);
+  shopRows = [];
+  if (!list.length) {                                  // nothing for sale yet: every animal is free
+    para('All the animals are free! 🎉 Keep saving your coins: new animals for the shop are coming soon.',
+      W / 2, H * 0.42, Math.min(20, W / 20), '#fff', Math.min(W - 32, 460));
+    label('Tap anywhere to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
+    return;
+  }
   const top = H < 520 ? 104 : 130;                     // leave room for the message at the bottom
   const rowH = Math.min(70, (H - top - 100) / list.length), fs = Math.min(20, W / 20, rowH * 0.36), left = Math.max(16, W / 2 - 200);
   shopRows = [];
