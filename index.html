@@ -76,7 +76,7 @@ let score = 0, timeLeft = LEVEL_TIME, state = 'title';   // states: title, play,
 let squeeze = 0, chew = 0, hungryShake = 0;
 let drag = null;            // the food you're carrying
 let spawnTimer = 0;
-let best = 0, bestLevel = 0, muted = false;
+let best = 0, bestLevel = 0, muted = false, newBest = false;
 try {
   best = +localStorage.getItem('poopBest') || 0;
   bestLevel = +localStorage.getItem('poopBestLevel') || 0;
@@ -539,7 +539,9 @@ function update(dt) {
     timeLeft -= dt;
   }
   if (timeLeft <= 0) {
-    timeLeft = 0; state = 'over'; drag = null; sfx('end');
+    timeLeft = 0; state = 'over'; drag = null; texts = []; toast = null;
+    newBest = score > best && score > 0;
+    sfx(newBest ? 'level' : 'end');                     // happy tune for a new best, sad tune otherwise
     if (score > best) { best = score; try { localStorage.setItem('poopBest', best); } catch (e) {} }
     if (level > bestLevel) { bestLevel = level; try { localStorage.setItem('poopBestLevel', bestLevel); } catch (e) {} }
   }
@@ -874,7 +876,12 @@ function draw() {
       let y = short ? H * 0.2 : H * 0.28;
       label("TIME'S UP!", W / 2, y, ss, '#ffe14d');
       y = para(`You made it to Level ${level} and pooped on people for ${score} points`, W / 2, y + ss * 1.2, ts, '#fff', W - 32);
-      label(`Best: ${best} points · Level ${bestLevel}`, W / 2, y + ts * 0.4, ts, '#fff');
+      if (newBest) {
+        const pulse = 1 + Math.sin(performance.now() / 150) * 0.06;
+        label('🎉 NEW BEST! 🎉', W / 2, y + ts * 0.4, ts * 1.2 * pulse, '#ffe14d');
+      } else {
+        label(`Best: ${best} points · Level ${bestLevel}`, W / 2, y + ts * 0.4, ts, '#fff');
+      }
       label('Click to play again', W / 2, Math.min(y + ts * 2.6, trophyLineY() - 40), Math.min(32, W / 16), '#ff7ad9');
     }
     label(`🏆 Achievements: ${unlocked.size}/${ACHIEVEMENTS.length}  (tap here to see)`, W / 2, trophyLineY(), Math.min(18, W / 22), '#ffe14d');
