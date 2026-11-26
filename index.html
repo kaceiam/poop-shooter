@@ -61,6 +61,8 @@ const ANIMALS = [
     price: 250, shopText: 'Boomerang poop comes back and splats again' },
   { name: 'Dragon',   emoji: '🐉', food: '🌶️', foodName: 'peppers', maxAmmo: 2, perFood: 1, splat: 32, speed: 1.1, chain: 2,
     price: 300, shopText: 'Poop jumps to 2 more people nearby' },
+  { name: 'Whale',    emoji: '🐳', food: '🦑', foodName: 'squid', maxAmmo: 2, perFood: 1, splat: 30, speed: 1.0, storm: true,
+    price: 350, shopText: 'Makes a storm cloud that rains poop' },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 // What each animal does, for the help screen (shop animals use their shopText).
@@ -228,6 +230,7 @@ const REACTIONS = {
   Octopus:  ['scared',  ['Tentacles?! 🐙', 'Run!']],
   Kangaroo: ['curious', ['Is that a kangaroo? 🦘', 'Boing?']],
   Dragon:   ['scared',  ['A DRAGON?! 🐉', 'Hot hot hot!']],
+  Whale:    ['curious', ['A WHALE?! 🐳', 'Is it going to rain?']],
 };
 let reactTimer = 5;
 function reactTo(a, count) {
@@ -411,6 +414,7 @@ function land(p) {
   if (place().snowy) Object.assign(splats[splats.length - 1], { vx: 140, got: new Set() });   // on the mountain, poop rolls downhill
   if (ANIMALS[p.animal].freeze) freezeAround(p.tx, p.ty);   // penguin!
   if (ANIMALS[p.animal].stink) clouds.push({ x: p.tx, y: p.ty, r: 60, life: 3, got: new Set() });   // skunk!
+  if (ANIMALS[p.animal].storm && !p.stormDrop) storms.push({ x: p.tx, y: p.ty, life: 3, next: 0, animal: p.animal });   // whale: a poop storm!
   if (ANIMALS[p.animal].boomerang && !p.back) {        // kangaroo: the poop swoops back toward you
     const tx = p.tx + (p.sx - p.tx) * 0.75, ty = Math.min(pocketTop() - 20, p.ty + (p.sy - p.ty) * 0.75);
     poops.push({ sx: p.tx, sy: p.ty, tx, ty, t: 0, dur: 0.7, size: p.size, animal: p.animal, back: true, got: new Set() });
@@ -522,7 +526,19 @@ function strike(person, countsForStreak, x, y, fromCloud) {
 }
 
 // Skunk stink clouds hang around for a few seconds. Anyone who walks in gets splatted (once per cloud).
-let clouds = [];
+let clouds = [], storms = [];
+// Whale storms rain little poops around the spot for a few seconds (the drops don't make new storms).
+function updateStorms(dt) {
+  for (const s of storms) {
+    s.life -= dt; s.next -= dt;
+    if (s.next <= 0 && s.life > 0) {
+      s.next = 0.22;
+      const x = s.x + (Math.random() * 2 - 1) * 75, y = s.y + (Math.random() * 2 - 1) * 30;
+      poops.push({ sx: x, sy: s.y - 110, tx: x, ty: y, t: 0, dur: 0.35, size: 24, animal: s.animal, drop: true, stormDrop: true });
+    }
+  }
+  storms = storms.filter(s => s.life > 0);
+}
 function updateClouds(dt) {
   for (const c of clouds) {
     c.life -= dt;
@@ -1029,7 +1045,7 @@ function finishTutorial() {
 }
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
-  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
+  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = []; storms = [];
   reactTimer = 5;
   const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city', 'The Jungle': 'jungle', 'The Desert': 'desert', 'The Harbor': 'harbor' }[place().name];
   if (placeId) unlock(placeId);
@@ -1169,6 +1185,7 @@ function update(dt) {
   }
   poops = poops.filter(p => p.t < p.dur);
   updateClouds(dt);
+  updateStorms(dt);
   if (state === 'play' && !tut && mode !== 'rush' && mode !== 'duo' && levelScore >= goal()) levelUp();
   for (const s of splats) {
     s.life -= dt;
@@ -1537,6 +1554,11 @@ function draw() {
     ctx.beginPath(); ctx.arc(pu.x, pu.y + bob, 26, 0, Math.PI * 2); ctx.fill();
     emoji(POWERS[pu.kind].emoji, pu.x, pu.y + bob, 36);
     if (landed) label('tap!', pu.x, pu.y + 38, 14, '#fff');
+  }
+  for (const s of storms) {                            // whale storm clouds
+    ctx.globalAlpha = Math.min(1, s.life * 2);
+    emoji('⛈️', s.x, s.y - 130, 56);
+    ctx.globalAlpha = 1;
   }
   for (const c of clouds) {                            // green stink clouds
     ctx.globalAlpha = Math.min(0.55, c.life * 0.5);
