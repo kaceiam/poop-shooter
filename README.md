@@ -7,8 +7,8 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 1. Download this folder and double-click `index.html` to open it in your browser.
 2. **Click the park** to squeeze your animal and shoot poop where you clicked. The poop takes a moment to fly, so aim ahead of people who are walking.
 3. **Out of poop?** Your animal gets hungry. Drag its food from the red bowl to its mouth to feed it and reload.
-4. **Switch animals** with keys 1-9, 0 and - or the buttons in your pocket.
-   Your points turn into coins 🪙 after each game. Save them for the 🛒 shop (bottom of the start screen, or press S): the duck 🦆, bat 🦇, penguin 🐧 and octopus 🐙 are waiting!
+4. **Switch animals** with keys 1-9, 0, - and = or the buttons in your pocket.
+   Your points turn into coins 🪙 after each game. Save them for the 🛒 shop (bottom of the start screen, or press S): the duck 🦆, bat 🦇, penguin 🐧, octopus 🐙 and kangaroo 🦘 are waiting!
    The shop also has 🎩 hats for your pocket animal (just for looks).
 5. Each level gives you 40 seconds to reach a goal score. Make it and you go to the next level, where people walk faster and there are more of them. Runners 🏃 are worth 3, and hitting two people with one poop gives a bonus. Hit someone again within 2 seconds for a 🔥 combo: x2, then x3!
 6. Watch out for sneaky people! They hop out of the way of small poops (bird, dog), but they can't escape the big splats (cow, elephant). They're worth 2, and there are more of them every level.
@@ -37,5 +37,6 @@ Tap **❓ Help** on the start screen (or press ?) for a how-to-play guide. Press
 | 🦇 Bat (shop, 100 🪙) | mosquitoes 🦟 | 2 | swoops over and drops a line of 4 poops from the sky |
 | 🐧 Penguin (shop, 150 🪙) | fish 🐟 | 2 | ice poop freezes everyone nearby for 3 seconds |
 | 🐙 Octopus (shop, 200 🪙) | shrimp 🦐 | 2 | poop splits into 4 mini poops that splash outward |
+| 🦘 Kangaroo (shop, 250 🪙) | leaves 🍃 | 2 | boomerang poop: splats, then swoops back and splats again |
 
 Want to change how strong they are? Open `index.html` and look for `ANIMALS` near the top.
