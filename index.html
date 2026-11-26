@@ -32,7 +32,7 @@ const ANIMALS = [
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 
-const PEOPLE = ['🚶', '🚶‍♀️', '🏃', '🧍', '🕺', '👮', '🧑‍🍳', '🤵'];
+const PEOPLE = ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'];   // full-body people only
 const YUCKS = ['EWW!', 'GROSS!', 'NOOO!', 'MY SHIRT!', 'YUCK!', 'WHY?!', 'EW EW EW'];
 const ROUND_TIME = 60;
 
@@ -114,7 +114,7 @@ function spawnPerson() {
   const scale = 0.55 + depth * 0.8;
   const dir = Math.random() < 0.5 ? 1 : -1;
   const emoji = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
-  const runner = emoji === '🏃';
+  const runner = emoji.startsWith('🏃');
   people.push({
     x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji,
     speed: (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5),
