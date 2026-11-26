@@ -15,7 +15,19 @@
 // ===== Poop Pocket =====
 // Click the park to SQUEEZE your animal and shoot poop.
 // When it's empty, drag its food from the bowl to its mouth to feed it.
-// Keys 1-4 (or tap the buttons) switch animals.
+// Keys 1-9, 0, - and = (or tap the buttons) switch animals.
+//
+// How this file is organized, top to bottom:
+//   1. ANIMALS, levels and PLACES          - the things you can change to tweak the game
+//   2. Sounds, Party mode, the shop, hats  - made with code, no sound or picture files
+//   3. Layout helpers                      - where the pocket, buttons and bowl go on any screen size
+//   4. People, the boss, shooting, splats  - spawnPerson, spawnBoss, shoot, land, strike
+//   5. Achievements, stats, challenges, combos, power-ups
+//   6. Clicks and keys                     - the pointerdown and keydown handlers
+//   7. Game modes                          - normal, Boss Rush, Zen and 2 Players
+//   8. update()                            - moves everything forward a little each frame
+//   9. Drawing                             - places, people, the pocket, menus, then draw()
+//  10. The game loop at the very bottom
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -875,7 +887,6 @@ const modeButtons = () => {
   }
   return list;
 };
-const rushBtn = () => modeButtons()[0];
 function startRush() {
   startGame();
   mode = 'rush'; tut = 0; rushBeaten = 0;
@@ -885,7 +896,6 @@ function startRush() {
 }
 // ---- Zen mode: no clock, no goals, no coins, no bests. Just splat for fun. ----
 let zenSplats = 0;
-const zenBtn = () => modeButtons()[1];
 const zenDoneBtn = () => ({ x: 12, y: 84, w: 104, h: 34 });
 function startZen() {
   startGame();
@@ -897,7 +907,7 @@ function zenNextPlace() {                              // float off somewhere ne
   addText(W / 2, horizon() + 60, `${place().icon} Welcome to ${place().name}!`, '#9ff');
   sfx('level');
 }
-function drawRushButton() {                             // draws all the mode buttons
+function drawModeButtons() {                             // draws all the mode buttons
   for (const b of modeButtons()) {
     ctx.fillStyle = b.color;
     ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 12); ctx.fill();
@@ -1679,7 +1689,7 @@ function draw() {
       y = para(recapText(), W / 2, y + ts * 1.5, Math.min(16, W / 26), '#9ff', W - 24);   // what happened this round
       label('Click to play again', W / 2, Math.min(y + ts * 1.4, trophyLineY() - 82), Math.min(32, W / 16), '#ff7ad9');
     }
-    drawRushButton();                                  // 👑 Boss Rush and 🧘 Zen, top left
+    drawModeButtons();                                  // 👑 Boss Rush and 🧘 Zen, top left
     const fs = Math.min(18, W / 22);
     const cs = Math.min(15, W / 26);                   // today's and this week's challenge, one line each
     label(daily.text(), W / 2, trophyLineY() - 54, cs, daily.done ? '#69f0ae' : '#fff', true, 'center', W - 20);
