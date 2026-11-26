@@ -46,4 +46,4 @@ Tap **❓ Help** on the start screen (or press ?) for a how-to-play guide. Press
 
 Each animal levels up as you splat people with it (Lv 1 to Lv 5 at 15, 40, 80 and 150 splats). Every level makes its splats 5% bigger.
 
-Want to change how strong they are? Open `index.html` and look for `ANIMALS` near the top.
+Want to change how strong they are? Open `index.html` and look for `ANIMALS` near the top. The places and their scenery are in `js/places.js`.
