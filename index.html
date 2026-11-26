@@ -1222,7 +1222,10 @@ function emojiPicture(ch, size) {
   const key = ch + '|' + size;
   let pic = emojiCache.get(key);
   if (!pic) {
-    if (emojiCache.size > 500) emojiCache.clear();      // don't let it grow forever
+    if (emojiCache.size > 600) {                       // don't let it grow forever: drop the 100 oldest pictures
+      let n = 0;
+      for (const k of emojiCache.keys()) { emojiCache.delete(k); if (++n >= 100) break; }
+    }
     pic = document.createElement('canvas');
     pic.width = pic.height = Math.ceil(size * 1.4);
     const c = pic.getContext('2d');
@@ -1356,16 +1359,16 @@ function drawShop() {
 }
 // ---- How to play: 4 pages, tap to go to the next one ----
 // ---- What's new: shown once after each update, tap to close ----
-const VERSION = '2026-11-26h';                         // change this after each update so the note shows again
+const VERSION = '2026-11-26i';                         // change this after each update so the note shows again
 const NEWS = [
+  ['🏴‍☠️', 'Pirate harbor', 'A rocking pirate ship, cannons and parrots'],
+  ['🐳', 'Whale', 'New in the shop: a storm cloud that rains poop'],
+  ['☃️', 'New bosses', 'Every place has its own giant boss!'],
+  ['✏️', 'Player names', 'Type your names in 2 Players'],
   ['🏜️', 'The desert', 'Pyramids, camels and blowing sand'],
   ['🌟', 'Golden people', 'Rare and sparkly. Splat one for 10 points!'],
   ['📅', 'Play calendar', 'See your days-in-a-row streak in Stats'],
-  ['⚡', 'Faster', 'The busiest places run smoother now'],
-  ['🌴', 'The jungle', 'Vines, a waterfall, parrots and a swinging monkey'],
   ['📸', 'Photo mode', 'Pause, then save a picture to your Downloads'],
-  ['⭐', 'Animal levels', 'Animals level up to Lv 5 for bigger splats'],
-  ['🐉', 'Dragon', 'New in the shop: chain poop jumps to 2 more people'],
 ];
 let showNews = false;
 try { showNews = localStorage.getItem('poopSeenVersion') !== VERSION; } catch (e) {}
