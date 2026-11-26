@@ -99,6 +99,9 @@ const PLACES = [
   { name: 'The Mountain', icon: '🏔️', snowy: true, sky: ['#90caf9', '#e3f2fd'], ground: '#f5f9ff', path: null,
     people: ['⛷️', '🏂', '⛷️', '🏂', '🚶', '🚶‍♀️', '🧍', '🧍‍♀️'], props: ['☕', '🧣', '🎿'],
     deco: [[0.08, 0.82, '☃️', 50], [0.9, 0.7, '🌲', 50], [0.6, 0.92, '🌲', 40]] },
+  { name: 'The City', icon: '🌃', indoor: true, rainy: true, sky: ['#0b0f2b', '#2c2a5a'], ground: '#3b3b48', path: '#f2c14e',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['📱', '📱', '🍕', '🛍️', '🌂'],
+    deco: [[0.1, 0.9, '🚏', 40], [0.88, 0.85, '🗑️', 30]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -360,8 +363,8 @@ function spawnPerson() {
   const dodger = !runner && Math.random() < dodgeChance();
   // Special people: umbrella people block one poop, skaters zoom by.
   const roll = Math.random();
-  const umbrella = !runner && !dodger && roll < 0.1;
-  const skater = !runner && !dodger && !umbrella && roll < 0.18;
+  const umbrella = !runner && !dodger && roll < (place().rainy ? 0.25 : 0.1);   // lots of umbrellas in the rainy city
+  const skater = !runner && !dodger && !umbrella && roll < (place().rainy ? 0.32 : 0.18);
   let speed = (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5) * speedBoost();
   if (skater) speed *= 2.2;
   const snowRider = emoji === '⛷️' || emoji === '🏂';  // skiers and snowboarders whoosh by
@@ -564,6 +567,7 @@ const ACHIEVEMENTS = [
   { id: 'moon',    icon: '🌙', name: 'One small step', how: 'Reach the moon' },
   { id: 'reef',    icon: '🐠', name: 'Under the sea', how: 'Reach the reef' },
   { id: 'mountain', icon: '🏔️', name: 'Snow day', how: 'Reach the mountain' },
+  { id: 'city',    icon: '🌃', name: 'City lights', how: 'Reach the city at night' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -956,7 +960,7 @@ function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
   reactTimer = 5;
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival', 'The Mall': 'mall', 'The Farm': 'farm', 'The Moon': 'moon', 'The Reef': 'reef', 'The Mountain': 'mountain', 'The City': 'city' }[place().name];
   if (placeId) unlock(placeId);
   dailyEvent('level', level);
   people = []; poops = []; splats = []; texts = [];
@@ -1364,6 +1368,38 @@ function drawPlace() {
   }
   ctx.fillStyle = here.ground; ctx.fillRect(0, hz, W, H);
 
+  if (here.name === 'The City') {
+    const top = pocketTop(), now = performance.now() / 1000;
+    emoji('🌙', W * 0.85, hz * 0.3, Math.min(44, hz * 0.35));
+    const count = Math.max(4, Math.floor(W / 110));                                  // tall buildings with lit windows
+    for (let i = 0; i < count; i++) {
+      const bw = W / count, bx = i * bw, bh = hz * (0.55 + ((i * 37) % 40) / 100);
+      ctx.fillStyle = i % 2 ? '#1c1f3f' : '#252850'; ctx.fillRect(bx + 3, hz - bh, bw - 6, bh);
+      for (let wy = hz - bh + 10; wy < hz - 14; wy += 16)
+        for (let wx = bx + 10; wx < bx + bw - 14; wx += 14)
+          if (((wx * 7 + wy * 13) | 0) % 5 < 2) { ctx.fillStyle = '#ffe082'; ctx.fillRect(wx, wy, 6, 8); }
+    }
+    const signs = [['PIZZA 🍕', '#ff4081'], ['OPEN', '#40c4ff'], ['CINEMA 🎬', '#b388ff']];   // neon signs
+    signs.forEach(([text, c], i) => {
+      const x = (i + 0.5) * W / signs.length, y = hz - 26, on = Math.sin(now * 3 + i * 2) > -0.8;   // they flicker
+      ctx.strokeStyle = on ? c : '#444'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.roundRect(x - 52, y - 15, 104, 30, 8); ctx.stroke();
+      label(text, x, y, 15, on ? c : '#555', false, 'center', 96);
+    });
+    for (let i = 0; i < 4; i++) {                                                     // street lamps
+      const x = (i + 0.5) * W / 4;
+      ctx.fillStyle = '#555'; ctx.fillRect(x - 2, hz - 4, 4, 34);
+      ctx.fillStyle = 'rgba(255,224,130,0.25)'; ctx.beginPath(); ctx.arc(x, hz - 4, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffe082'; ctx.beginPath(); ctx.arc(x, hz - 4, 5, 0, Math.PI * 2); ctx.fill();
+    }
+    const tx = ((now * 160) % (W + 200)) - 100, tx2 = W - ((now * 120 + 300) % (W + 200)) + 100;   // taxis
+    emoji('🚕', tx, hz + 18, 40, true); emoji('🚕', tx2, hz + 30, 36);
+    ctx.strokeStyle = 'rgba(180,200,255,0.35)'; ctx.lineWidth = 1;                    // a little rain
+    for (let i = 0; i < 50; i++) {
+      const x = (i * 53) % W, y = (now * 420 + i * 47) % top;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 10); ctx.stroke();
+    }
+  }
   if (here.name === 'The Mountain') {
     const top = pocketTop(), now = performance.now() / 1000;
     for (const [fx, fw, fh, c] of [[0.15, 0.5, 0.9, '#b0bec5'], [0.55, 0.6, 1.0, '#90a4ae'], [0.9, 0.45, 0.75, '#b0bec5']]) {
