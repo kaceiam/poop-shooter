@@ -7,8 +7,8 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 1. Download this folder and double-click `index.html` to open it in your browser.
 2. **Click the park** to squeeze your animal and shoot poop where you clicked. The poop takes a moment to fly, so aim ahead of people who are walking.
 3. **Out of poop?** Your animal gets hungry. Drag its food from the red bowl to its mouth to feed it and reload.
-4. **Switch animals** with keys 1-8 or the buttons in your pocket.
-   Your points turn into coins 🪙 after each game. Save them for the 🛒 shop (bottom of the start screen, or press S): the duck 🦆 is the first one, with more coming!
+4. **Switch animals** with keys 1-9 or the buttons in your pocket.
+   Your points turn into coins 🪙 after each game. Save them for the 🛒 shop (bottom of the start screen, or press S): the duck 🦆 and the bat 🦇 are waiting!
 5. Each level gives you 40 seconds to reach a goal score. Make it and you go to the next level, where people walk faster and there are more of them. Runners 🏃 are worth 3, and hitting two people with one poop gives a bonus. Hit someone again within 2 seconds for a 🔥 combo: x2, then x3!
 6. Watch out for sneaky people! They hop out of the way of small poops (bird, dog), but they can't escape the big splats (cow, elephant). They're worth 2, and there are more of them every level.
    People with umbrellas ☂️ block your first poop, and skaters 🛹 zoom by fast (worth 3).
@@ -32,5 +32,6 @@ Press **M** or click the speaker to mute. Press **P** or **Esc**, or tap ⏸️,
 | 🦄 Unicorn | strawberries 🍓 | 2 | magic poop that follows the person nearest your click |
 | 🦨 Skunk | bugs 🐛 | 2 | leaves a stink cloud that splats anyone who walks into it |
 | 🦆 Duck (shop, 60 🪙) | bread 🍞 | 3 | poop bounces to a second spot, like skipping a stone |
+| 🦇 Bat (shop, 100 🪙) | mosquitoes 🦟 | 2 | swoops over and drops a line of 4 poops from the sky |
 
 Want to change how strong they are? Open `index.html` and look for `ANIMALS` near the top.
