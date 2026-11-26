@@ -1426,16 +1426,16 @@ function drawShop() {
 }
 // ---- How to play: 4 pages, tap to go to the next one ----
 // ---- What's new: shown once after each update, tap to close ----
-const VERSION = '2026-11-26i';                         // change this after each update so the note shows again
+const VERSION = '2026-11-26j';                         // change this after each update so the note shows again
 const NEWS = [
+  ['🗺️', 'Free play', 'Play in any place you have reached (F)'],
+  ['🍭', 'Candy Town', 'Gumdrop hills, a chocolate river and a Cupcake Giant'],
+  ['🔋', 'Low power', 'Smoother on slow phones (pause screen, or L)'],
   ['🏴‍☠️', 'Pirate harbor', 'A rocking pirate ship, cannons and parrots'],
   ['🐳', 'Whale', 'New in the shop: a storm cloud that rains poop'],
   ['☃️', 'New bosses', 'Every place has its own giant boss!'],
   ['✏️', 'Player names', 'Type your names in 2 Players'],
-  ['🏜️', 'The desert', 'Pyramids, camels and blowing sand'],
   ['🌟', 'Golden people', 'Rare and sparkly. Splat one for 10 points!'],
-  ['📅', 'Play calendar', 'See your days-in-a-row streak in Stats'],
-  ['📸', 'Photo mode', 'Pause, then save a picture to your Downloads'],
 ];
 let showNews = false;
 try { showNews = localStorage.getItem('poopSeenVersion') !== VERSION; } catch (e) {}
