@@ -1317,16 +1317,16 @@ function drawShop() {
 }
 // ---- How to play: 4 pages, tap to go to the next one ----
 // ---- What's new: shown once after each update, tap to close ----
-const VERSION = '2026-11-26g';                         // change this after each update so the note shows again
+const VERSION = '2026-11-26h';                         // change this after each update so the note shows again
 const NEWS = [
+  ['🏜️', 'The desert', 'Pyramids, camels and blowing sand'],
+  ['🌟', 'Golden people', 'Rare and sparkly. Splat one for 10 points!'],
+  ['📅', 'Play calendar', 'See your days-in-a-row streak in Stats'],
+  ['⚡', 'Faster', 'The busiest places run smoother now'],
   ['🌴', 'The jungle', 'Vines, a waterfall, parrots and a swinging monkey'],
   ['📸', 'Photo mode', 'Pause, then save a picture to your Downloads'],
   ['⭐', 'Animal levels', 'Animals level up to Lv 5 for bigger splats'],
-  ['💡', 'New tips', 'A couple of quick tips about the newest stuff'],
-  ['🌃', 'The city at night', 'Neon signs, taxis and lots of umbrellas'],
   ['🐉', 'Dragon', 'New in the shop: chain poop jumps to 2 more people'],
-  ['🌈', 'More hats', 'Flower, strawberry, star, rainbow and fire'],
-  ['👥', '2 Players', 'Take turns with a friend. Highest score wins! (T)'],
 ];
 let showNews = false;
 try { showNews = localStorage.getItem('poopSeenVersion') !== VERSION; } catch (e) {}
