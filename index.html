@@ -57,6 +57,8 @@ const ANIMALS = [
     price: 200, shopText: 'Poop splits into 4 mini poops' },
   { name: 'Kangaroo', emoji: '🦘', food: '🍃', foodName: 'leaves', maxAmmo: 2, perFood: 1, splat: 34, speed: 1.1, boomerang: true,
     price: 250, shopText: 'Boomerang poop comes back and splats again' },
+  { name: 'Dragon',   emoji: '🐉', food: '🌶️', foodName: 'peppers', maxAmmo: 2, perFood: 1, splat: 32, speed: 1.1, chain: 2,
+    price: 300, shopText: 'Poop jumps to 2 more people nearby' },
 ];
 ANIMALS.forEach(a => a.ammo = a.maxAmmo);
 // What each animal does, for the help screen (shop animals use their shopText).
@@ -259,6 +261,7 @@ const REACTIONS = {
   Penguin:  ['curious', ['Aww, a penguin! 🐧', 'So cute!']],
   Octopus:  ['scared',  ['Tentacles?! 🐙', 'Run!']],
   Kangaroo: ['curious', ['Is that a kangaroo? 🦘', 'Boing?']],
+  Dragon:   ['scared',  ['A DRAGON?! 🐉', 'Hot hot hot!']],
 };
 let reactTimer = 5;
 function reactTo(a, count) {
@@ -468,6 +471,18 @@ function land(p) {
   }
   if (hits) sfx('eww');
   if (hits >= 2) { addPoints(hits); addText(p.tx, p.ty - 110, `${hits} AT ONCE!`, '#9ff'); }
+  if (ANIMALS[p.animal].chain && hits && !p.chained) chainPoop(p);   // dragon: fiery poop jumps to people nearby
+}
+
+// Dragon: after a hit, fiery poops jump to the nearest people (they can't jump again).
+function chainPoop(p) {
+  const targets = people.filter(q => !q.hit && Math.hypot(q.x - p.tx, q.y - 35 * q.scale - p.ty) < 230)
+    .sort((a, b) => Math.hypot(a.x - p.tx, a.y - p.ty) - Math.hypot(b.x - p.tx, b.y - p.ty))
+    .slice(0, ANIMALS[p.animal].chain);
+  for (const t of targets) {
+    poops.push({ sx: p.tx, sy: p.ty, tx: t.x, ty: t.y - 35 * t.scale, t: 0, dur: 0.3, size: p.size, animal: p.animal, chained: true, follow: t });
+  }
+  if (targets.length) addText(p.tx, p.ty - 70, 'ZAP! 🔥', '#ffab40');
 }
 
 // On the mountain a splat rolls downhill for a moment and splats anyone it bumps into.
@@ -1603,6 +1618,7 @@ function drawPoopFlying(p) {
   const y = p.sy + (p.ty - p.sy) * k - Math.sin(k * Math.PI) * arc;
   const size = (p.size * 0.9) * (1 - k * 0.45);
   if (ANIMALS[p.animal].homing) emoji('✨', x - (p.tx - p.sx) * 0.06, y + 14, size * 0.8);   // magic sparkles
+  if (p.chained) emoji('🔥', x - 8, y + 10, size * 0.8);                       // dragon fire trail
   emoji('💩', x, y, size);
 }
 
