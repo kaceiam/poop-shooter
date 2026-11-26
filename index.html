@@ -40,6 +40,8 @@ let level = 1, levelScore = 0, bannerTime = 0;
 const goal = () => 5 + level * 3;                       // level 1 = 8 points, level 2 = 11, ...
 const speedBoost = () => 1 + 0.18 * (level - 1);        // people get faster every level
 const crowdBoost = () => 1 + 0.25 * (level - 1);        // and there are more of them
+const dodgeChance = () => Math.min(0.45, 0.1 + 0.08 * (level - 1));   // more sneaky dodgers too
+const NOPES = ['Nope!', 'Missed me!', 'Too slow!', 'Hah!', 'Not today!'];
 
 let current = 0;
 let people = [], poops = [], splats = [], texts = [];
@@ -90,6 +92,7 @@ function sfx(kind, animal) {
   if (kind === 'eww')    tone('square', 560, 240, 0.4, 0.07);
   if (kind === 'nom')    { tone('sine', 300, 450, 0.08, 0.3); tone('sine', 300, 450, 0.08, 0.3, 0.15); }
   if (kind === 'empty')  tone('triangle', 300, 140, 0.3, 0.25);
+  if (kind === 'dodge')  { noise(0.15, 3000, 0.2); tone('sine', 500, 1200, 0.12, 0.08); }
   if (kind === 'switch') tone('sine', 600, 900, 0.08, 0.15);
   if (kind === 'level')  [523, 659, 784, 1046].forEach((f, i) => tone('square', f, f * 1.01, 0.16, 0.07, i * 0.16));
   if (kind === 'end')    [392, 330, 262, 196].forEach((f, i) => tone('triangle', f, f * 0.98, 0.25, 0.15, i * 0.22));
@@ -128,10 +131,12 @@ function spawnPerson() {
   const dir = Math.random() < 0.5 ? 1 : -1;
   const emoji = PEOPLE[Math.floor(Math.random() * PEOPLE.length)];
   const runner = emoji.startsWith('🏃');
+  const dodger = !runner && Math.random() < dodgeChance();
   people.push({
     x: dir === 1 ? -60 : W + 60, y, scale, dir, emoji,
     speed: (runner ? 140 : 60 + Math.random() * 50) * (0.6 + scale * 0.5) * speedBoost(),
-    points: runner ? 3 : 1, hit: false, bob: Math.random() * 6,
+    points: runner ? 3 : dodger ? 2 : 1, hit: false, bob: Math.random() * 6,
+    dodger, dodgeTime: 0, dodgeDir: 1, dodgeSpeed: 0, pause: 0, cool: 0,
   });
   people.sort((a, b) => a.y - b.y);                  // far people drawn first
 }
@@ -160,7 +165,7 @@ function land(p) {
         Math.abs(bodyY - p.ty) < size * 0.55 + p.size * 0.3) {
       person.hit = true;
       person.dir = person.x < W / 2 ? -1 : 1;        // run off the nearest side
-      person.speed = 320;
+      person.speed = 320; person.dodgeTime = 0; person.pause = 0;
       hits++;
       addPoints(person.points);
       addText(person.x, person.y - size - 10, YUCKS[Math.floor(Math.random() * YUCKS.length)], '#fff');
@@ -239,8 +244,42 @@ function levelUp() {
 
 // ---- Update ----
 function movePeople(dt) {
-  for (const p of people) { p.x += p.dir * p.speed * dt; p.bob += dt * (p.hit ? 18 : 8); }
+  for (const p of people) {
+    if (p.dodgeTime > 0) {                             // quick hop sideways
+      p.x += p.dodgeDir * p.dodgeSpeed * Math.min(dt, p.dodgeTime);
+      p.dodgeTime -= dt;
+      if (p.dodgeTime <= 0) p.pause = 0.5;             // then stop to look back. Phew!
+      p.bob += dt * 18;
+    } else if (p.pause > 0) {
+      p.pause -= dt;
+    } else {
+      p.x += p.dir * p.speed * dt;
+      p.bob += dt * (p.hit ? 18 : 8);
+    }
+  }
   people = people.filter(p => p.x > -120 && p.x < W + 120);
+}
+// Sneaky people watch the poop. Once it's partway there, if it's coming at them, they dash away.
+function checkDodges(dt) {
+  for (const p of people) {
+    if (!p.dodger || p.hit) continue;
+    p.cool -= dt;
+    if (p.cool > 0) continue;
+    const size = 70 * p.scale, bodyY = p.y - size * 0.45;
+    for (const poop of poops) {
+      if (poop.t / poop.dur < 0.35) continue;          // they don't notice it right away
+      if (Math.abs(p.x - poop.tx) < size * 0.4 + poop.size * 0.4 + 20 &&
+          Math.abs(bodyY - poop.ty) < size * 0.55 + poop.size * 0.3) {
+        // Hop away from where it will land. The hop is just far enough to escape small poops
+        // (bird, dog) but not big ones (cow, elephant).
+        p.dodgeDir = p.x >= poop.tx ? 1 : -1;
+        p.dodgeTime = 0.2; p.dodgeSpeed = (28 * p.scale + 22) / 0.2; p.cool = 2;
+        addText(p.x, p.y - size - 10, NOPES[Math.floor(Math.random() * NOPES.length)], '#9ff');
+        sfx('dodge');
+        break;
+      }
+    }
+  }
 }
 function update(dt) {
   squeeze = Math.max(0, squeeze - dt);
@@ -266,6 +305,7 @@ function update(dt) {
   const busy = (1.6 - Math.min(1, (LEVEL_TIME - timeLeft) / LEVEL_TIME) * 0.6) / crowdBoost();
   if (spawnTimer <= 0) { spawnPerson(); spawnTimer = busy * (0.6 + Math.random() * 0.8); }
 
+  checkDodges(dt);
   movePeople(dt);
 
   for (const p of poops) { p.t += dt; if (p.t >= p.dur) land(p); }
@@ -408,7 +448,7 @@ function draw() {
       y += s * 1.3;
       y = para('Click the park to SQUEEZE your animal and shoot poop at people.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Out of poop? Drag the food from the bowl into its mouth to feed it.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
-      y = para('Switch animals with 1-4 or the buttons. Runners 🏃 are worth 3!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
+      y = para('Switch animals with 1-4 or the buttons. Runners 🏃 are worth 3. Sneaky people dodge, but big poops are hard to escape!', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
       y = para('Reach the goal before time runs out to get to the next level!', W / 2, y, ts, '#ffe14d', maxW);
       label('Click to start', W / 2, y + Math.min(32, W / 16) * 1.5, Math.min(32, W / 16), '#ff7ad9');
     } else {
