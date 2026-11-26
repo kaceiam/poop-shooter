@@ -9,6 +9,7 @@ A silly browser game by Kace. You've got an animal in your pocket. Squeeze it to
 3. **Out of poop?** Your animal gets hungry. Drag its food from the red bowl to its mouth to feed it and reload.
 4. **Switch animals** with keys 1-9, 0 and - or the buttons in your pocket.
    Your points turn into coins 🪙 after each game. Save them for the 🛒 shop (bottom of the start screen, or press S): the duck 🦆, bat 🦇, penguin 🐧 and octopus 🐙 are waiting!
+   The shop also has 🎩 hats for your pocket animal (just for looks).
 5. Each level gives you 40 seconds to reach a goal score. Make it and you go to the next level, where people walk faster and there are more of them. Runners 🏃 are worth 3, and hitting two people with one poop gives a bonus. Hit someone again within 2 seconds for a 🔥 combo: x2, then x3!
 6. Watch out for sneaky people! They hop out of the way of small poops (bird, dog), but they can't escape the big splats (cow, elephant). They're worth 2, and there are more of them every level.
    People with umbrellas ☂️ block your first poop, and skaters 🛹 zoom by fast (worth 3).

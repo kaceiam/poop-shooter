@@ -179,6 +179,36 @@ try {
   owned = new Set(JSON.parse(localStorage.getItem('poopOwned') || '[]'));
 } catch (e) {}
 const isOwned = a => !a.price || owned.has(a.name);
+// Hats for your pocket animal (looks only). Buy once, then wear any one of them.
+const ANIMAL_HATS = [
+  { id: 'cap',    emoji: '🧢', name: 'cap',      price: 15 },
+  { id: 'bow',    emoji: '🎀', name: 'bow',      price: 15 },
+  { id: 'top',    emoji: '🎩', name: 'top hat',  price: 25 },
+  { id: 'sun',    emoji: '👒', name: 'sun hat',  price: 25 },
+  { id: 'grad',   emoji: '🎓', name: 'grad cap', price: 35 },
+  { id: 'helmet', emoji: '⛑️', name: 'helmet',   price: 35 },
+  { id: 'crown',  emoji: '👑', name: 'crown',    price: 100 },
+];
+let shopTab = 'animals', shopTabs = [], shopCells = [], hatsOwned = new Set(), hatOn = '';
+try {
+  hatsOwned = new Set(JSON.parse(localStorage.getItem('poopHats') || '[]'));
+  hatOn = localStorage.getItem('poopHatOn') || '';
+} catch (e) {}
+function saveHats() {
+  try { localStorage.setItem('poopHats', JSON.stringify([...hatsOwned])); localStorage.setItem('poopHatOn', hatOn); } catch (e) {}
+}
+function tapHat(h) {
+  if (hatsOwned.has(h.id)) {                           // already yours: wear it, or take it off
+    hatOn = hatOn === h.id ? '' : h.id;
+    shopMsg = hatOn ? `Your animal is wearing the ${h.name}! ${h.emoji}` : 'Hat off!';
+  } else if (coins < h.price) {
+    shopMsg = `You need ${h.price - coins} more coins for the ${h.name}!`; sfx('empty'); return;
+  } else {
+    coins -= h.price; saveShop(); hatsOwned.add(h.id); hatOn = h.id;
+    shopMsg = `You got the ${h.name}! ${h.emoji}`; sfx('power');
+  }
+  saveHats();
+}
 function saveShop() {
   try { localStorage.setItem('poopCoins', coins); localStorage.setItem('poopOwned', JSON.stringify([...owned])); } catch (e) {}
 }
@@ -197,6 +227,8 @@ function selectAnimal(i) {
 const muteBtn = () => ({ x: W - 44, y: 30 });
 
 // ---- Party mode (looks only): silly hats on people and confetti on big moments ----
+// A menu (shop, help, achievements, what's new) covers the screen: hide the party button so it can't get in the way.
+const menuOpen = () => (state === 'title' || state === 'over') && (showShop || showTrophies || helpPage || showNews);
 const partyBtn = () => W < 600 ? { x: W - 44, y: 118 } : { x: W - 90, y: 30 };   // under the pause button on phones
 const HATS = ['🎩', '👒', '🧢', '🎓'];
 const CONFETTI_COLORS = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff9100'];
@@ -626,14 +658,19 @@ canvas.addEventListener('pointerdown', e => {
   const m = muteBtn();
   if (Math.hypot(p.x - m.x, p.y - m.y) < 26) { toggleMute(); return; }
   const pt = partyBtn();
-  if (Math.hypot(p.x - pt.x, p.y - pt.y) < 22) { toggleParty(); return; }
+  if (!menuOpen() && Math.hypot(p.x - pt.x, p.y - pt.y) < 22) { toggleParty(); return; }
   if (paused) { setPaused(false); return; }           // any click un-pauses
   const pb = pauseBtn();
   if (canPause() && Math.hypot(p.x - pb.x, p.y - pb.y) < 22) { setPaused(true); return; }
   if (state === 'title' || state === 'over') {
-    if (showShop) {                                   // tap an animal to buy it, anywhere else to go back
+    if (showShop) {                                   // tabs, then animals or hats; anywhere else goes back
+      const tab = shopTabs.find(t => Math.abs(p.x - t.x) < 75 && p.y > 96 && p.y < 130);
+      if (tab) { shopTab = tab.id; shopMsg = ''; return; }
       const row = shopRows.find(r => p.y > r.y - r.h / 2 && p.y < r.y + r.h / 2);
-      if (row && !isOwned(row.a)) buy(row.a); else { showShop = false; shopMsg = ''; }
+      const cell = shopCells.find(c => p.x > c.x && p.x < c.x + c.w && p.y > c.y && p.y < c.y + c.ht);
+      if (row && !isOwned(row.a)) buy(row.a);
+      else if (cell) tapHat(cell.h);
+      else { showShop = false; shopMsg = ''; }
       return;
     }
     if (showNews) { closeNews(); return; }
@@ -918,32 +955,47 @@ function drawHud() {
 const trophyLineY = () => H - 28;
 function drawShop() {
   ctx.fillStyle = '#10202a'; ctx.fillRect(0, 0, W, H);
-  label('🛒 Animal Shop', W / 2, 44, Math.min(34, W / 12), '#9ff');
-  label(`You have 🪙 ${coins} coins`, W / 2, 82, Math.min(20, W / 20), '#ffe14d');
-  const list = ANIMALS.filter(a => a.price);
-  shopRows = [];
-  if (!list.length) {                                  // nothing for sale yet: every animal is free
-    para('All the animals are free! 🎉 Keep saving your coins: new animals for the shop are coming soon.',
-      W / 2, H * 0.42, Math.min(20, W / 20), '#fff', Math.min(W - 32, 460));
-    label('Tap anywhere to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
-    return;
+  label('🛒 Shop', W / 2, 40, Math.min(32, W / 12), '#9ff');
+  label(`You have 🪙 ${coins} coins`, W / 2, 76, Math.min(20, W / 20), '#ffe14d');
+  // Two tabs: animals and hats
+  shopTabs = [{ id: 'animals', text: '🐾 Animals', x: W / 2 - 85 }, { id: 'hats', text: '🎩 Hats', x: W / 2 + 85 }];
+  for (const t of shopTabs) {
+    const on = shopTab === t.id;
+    ctx.fillStyle = on ? '#9ff' : 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.roundRect(t.x - 75, 96, 150, 34, 10); ctx.fill();
+    label(t.text, t.x, 113, 17, on ? '#10202a' : '#fff', false);
   }
-  const top = H < 520 ? 104 : 130;                     // leave room for the message at the bottom
-  const rowH = Math.min(70, (H - top - 100) / list.length), fs = Math.min(20, W / 20, rowH * 0.36), left = Math.max(16, W / 2 - 200);
-  shopRows = [];
-  list.forEach((a, i) => {
-    const y = top + i * rowH + rowH / 2, have = isOwned(a), afford = coins >= a.price;
-    shopRows.push({ a, y, h: rowH });
-    ctx.fillStyle = have ? 'rgba(105,240,174,0.15)' : 'rgba(255,255,255,0.08)';
-    ctx.beginPath(); ctx.roundRect(left - 8, y - rowH / 2 + 4, Math.min(W - 16, 416), rowH - 8, 12); ctx.fill();
-    emoji(a.emoji, left + 24, y, Math.min(44, rowH * 0.7));
-    label(a.name, left + 60, y - fs * 0.45, fs, '#fff', true, 'left');
-    label(a.shopText,
-      left + 60, y + fs * 0.6, fs * 0.7, '#ccc', false, 'left');
-    label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
-  });
-  if (shopMsg) para(shopMsg, W / 2, H - 62, Math.min(18, W / 22), '#ffe14d', W - 32);
-  label('Tap an animal to buy it · tap anywhere else to go back', W / 2, H - 28, Math.min(15, W / 26), '#ff7ad9');
+  shopRows = []; shopCells = [];
+  const top = 142, fs0 = Math.min(20, W / 20);
+  if (shopTab === 'animals') {
+    const list = ANIMALS.filter(a => a.price);
+    const rowH = Math.min(70, (H - top - 90) / list.length), fs = Math.min(fs0, rowH * 0.36), left = Math.max(16, W / 2 - 200);
+    list.forEach((a, i) => {
+      const y = top + i * rowH + rowH / 2, have = isOwned(a), afford = coins >= a.price;
+      shopRows.push({ a, y, h: rowH });
+      ctx.fillStyle = have ? 'rgba(105,240,174,0.15)' : 'rgba(255,255,255,0.08)';
+      ctx.beginPath(); ctx.roundRect(left - 8, y - rowH / 2 + 4, Math.min(W - 16, 416), rowH - 8, 12); ctx.fill();
+      emoji(a.emoji, left + 24, y, Math.min(44, rowH * 0.7));
+      label(a.name, left + 60, y - fs * 0.45, fs, '#fff', true, 'left');
+      label(a.shopText, left + 60, y + fs * 0.6, fs * 0.7, '#ccc', false, 'left', Math.min(W - 32, 400) - 140);
+      label(have ? '✅ Yours!' : `🪙 ${a.price}`, left + Math.min(W - 32, 400) - 8, y, fs, have ? '#69f0ae' : afford ? '#ffe14d' : '#ff8a80', true, 'right');
+    });
+  } else {
+    const cols = Math.max(2, Math.min(4, Math.floor((W - 24) / 100))), rows = Math.ceil(ANIMAL_HATS.length / cols);
+    const cw = Math.min(110, (W - 24) / cols), ch = Math.min(96, (H - top - 90) / rows), x0 = W / 2 - (cols * cw) / 2;
+    ANIMAL_HATS.forEach((h, i) => {
+      const x = x0 + (i % cols) * cw, y = top + Math.floor(i / cols) * ch, have = hatsOwned.has(h.id), wearing = hatOn === h.id;
+      shopCells.push({ h, x, y, w: cw, ht: ch });
+      ctx.fillStyle = wearing ? 'rgba(255,225,77,0.3)' : have ? 'rgba(105,240,174,0.15)' : 'rgba(255,255,255,0.08)';
+      ctx.beginPath(); ctx.roundRect(x + 4, y + 4, cw - 8, ch - 8, 12); ctx.fill();
+      emoji(h.emoji, x + cw / 2, y + ch * 0.4, Math.min(40, ch * 0.45));
+      const tag = wearing ? 'Wearing' : have ? 'Wear it' : `🪙 ${h.price}`;
+      label(tag, x + cw / 2, y + ch * 0.8, Math.min(15, ch * 0.18), wearing ? '#ffe14d' : have ? '#69f0ae' : coins >= h.price ? '#fff' : '#ff8a80', true, 'center', cw - 12);
+    });
+  }
+  if (shopMsg) para(shopMsg, W / 2, H - 60, Math.min(18, W / 22), '#ffe14d', W - 32);
+  label(shopTab === 'animals' ? 'Tap an animal to buy it · tap anywhere else to go back' : 'Tap a hat to buy or wear it · tap anywhere else to go back',
+    W / 2, H - 26, Math.min(15, W / 26), '#ff7ad9', true, 'center', W - 16);
 }
 // ---- How to play: 4 pages, tap to go to the next one ----
 // ---- What's new: shown once after each update, tap to close ----
@@ -1197,6 +1249,8 @@ function drawPocket() {
   ctx.save(); ctx.translate(pos.x + shake, pos.y);
   ctx.scale(1 + sq * 0.35 + chomp, 1 - sq * 0.3 - chomp);
   emoji(a.emoji, 0, -10 * u, 90 * u);
+  const hat = ANIMAL_HATS.find(h => h.id === hatOn);
+  if (hat) emoji(hat.emoji, 0, -58 * u, 40 * u);       // your animal's hat (squishes along with it)
   ctx.restore();
   if (sq > 0) emoji('✊', pos.x + 55 * u, pos.y, 50 * u);             // your squeezing hand
   if (a.ammo === 0 && state === 'play') label('HUNGRY! Feed me →', Math.max(pos.x + 40, 110), top - 18, 20, '#ffe14d');
@@ -1374,7 +1428,7 @@ function draw() {
     emoji('⏸️', pauseBtn().x, pauseBtn().y, 26);
   }
   emoji(['🔇', '🔉', '🔊'][volume], muteBtn().x, muteBtn().y, 30);           // drawn last so it shows on every screen
-  ctx.globalAlpha = party ? 1 : 0.4; emoji('🎉', partyBtn().x, partyBtn().y, 28); ctx.globalAlpha = 1;
+  if (!menuOpen()) { ctx.globalAlpha = party ? 1 : 0.4; emoji('🎉', partyBtn().x, partyBtn().y, 28); ctx.globalAlpha = 1; }   // hidden behind menus
 }
 
 let last = performance.now();
