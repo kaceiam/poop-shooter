@@ -53,6 +53,9 @@ const PLACES = [
   { name: 'The Zoo', icon: '🦁', sky: ['#81d4fa', '#e1f5fe'], ground: '#8bc96a', path: '#d9c08a',
     people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️'], props: ['🎈', '🎈', '🎈', '🍿', '🪣', '🍌'],
     deco: [[0.1, 0.82, '🌿', 30], [0.9, 0.78, '🪨', 30], [0.55, 0.92, '🦩', 40]] },
+  { name: 'The Carnival', icon: '🎪', sky: ['#7e57c2', '#f8bbd0'], ground: '#d8b98a', path: '#c49a6c',
+    people: ['🚶', '🚶‍♀️', '🚶‍♂️', '🏃', '🏃‍♀️', '🧍', '🧍‍♀️', '🕺', '💃'], props: ['🍭', '🌭', '🧸', '🎈', '🍦'],
+    deco: [[0.08, 0.8, '🎯', 30], [0.88, 0.85, '🍿', 30], [0.5, 0.95, '🎠', 44]] },
 ];
 const ZOO_ANIMALS = ['🦁', '🐯', '🦒', '🐼', '🦓', '🐵'];
 let lastShotX = 0;                                       // zoo animals turn to watch where you shot
@@ -297,6 +300,7 @@ const ACHIEVEMENTS = [
   { id: 'beach',   icon: '🏖️', name: 'Beach day',       how: 'Reach the beach' },
   { id: 'school',  icon: '🏫', name: 'Back to school',  how: 'Reach the school' },
   { id: 'zoo',     icon: '🦁', name: 'Zoo trip',        how: 'Reach the zoo' },
+  { id: 'carnival', icon: '🎪', name: 'Carnival fun',   how: 'Reach the carnival' },
 ];
 let unlocked = new Set(), stats = { dodgers: 0, powers: 0 }, showTrophies = false, toast = null;
 try {
@@ -463,7 +467,7 @@ function finishTutorial() {
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
   powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0; clouds = [];
-  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo' }[place().name];
+  const placeId = { 'The Beach': 'beach', 'The School': 'school', 'The Zoo': 'zoo', 'The Carnival': 'carnival' }[place().name];
   if (placeId) unlock(placeId);
   people = []; poops = []; splats = []; texts = [];
   ANIMALS.forEach(a => a.ammo = a.maxAmmo);
@@ -720,6 +724,20 @@ function drawPlace() {
       ctx.fillRect(x, hz - bh * 0.84, 30, bh * 0.25); ctx.fillRect(x, hz - bh * 0.47, 30, bh * 0.25);
     }
     ctx.fillStyle = '#6d4c41'; ctx.fillRect(W / 2 - 25, hz - bh * 0.58, 50, bh * 0.58);   // door
+  }
+  if (here.name === 'The Carnival') {
+    const big = Math.min(130, hz * 0.85);
+    emoji('🎡', W * 0.18, hz - big * 0.45, big);                                  // Ferris wheel
+    emoji('🎢', W * 0.78, hz - big * 0.35, big * 0.8);                            // roller coaster
+    for (let i = 0; i < 4; i++) emoji('🎪', (i + 0.5) * W / 4 + 30, hz - 18, Math.min(56, hz * 0.4));
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.beginPath();               // string lights
+    for (let x = 0; x <= W; x += 10) ctx.lineTo(x, hz * 0.35 + Math.sin(x / 60) * 10);
+    ctx.stroke();
+    const colors = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb'], blink = Math.floor(performance.now() / 400);
+    for (let x = 20, i = 0; x < W; x += 40, i++) {
+      ctx.fillStyle = colors[(i + blink) % colors.length];
+      ctx.beginPath(); ctx.arc(x, hz * 0.35 + Math.sin(x / 60) * 10 + 4, 4, 0, Math.PI * 2); ctx.fill();
+    }
   }
   if (here.name === 'The Zoo') {
     const ch = Math.min(90, hz * 0.65), cw = 110, count = Math.max(2, Math.floor(W / 150));
