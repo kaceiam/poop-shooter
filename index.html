@@ -330,8 +330,10 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) setPa
 // ---- Layout helpers (the pocket shrinks to fit small screens like phones) ----
 const ui = () => Math.max(0.6, Math.min(1, W / 900, H / 700));   // 1 = full size
 const horizon = () => H * 0.28;
-const animalPos = () => { const u = ui(); return { x: Math.max(85 * u + 10, Math.min(W * 0.2, 170)), y: H - 95 * u }; };
-const bowlPos = () => { const u = ui(); return { x: W - Math.max(65 * u + 15, Math.min(W * 0.18, 150)), y: H - 80 * u }; };
+const upright = () => W < 600 && H >= W;                // a phone held upright: buttons go above the pocket
+const shortSideways = () => H < 430 && W > H;           // a phone held sideways: animal and bowl hug the edges
+const animalPos = () => { const u = ui(); return { x: shortSideways() ? 85 * u + 10 : Math.max(85 * u + 10, Math.min(W * 0.2, 170)), y: H - 95 * u }; };
+const bowlPos = () => { const u = ui(); return { x: W - (shortSideways() ? 65 * u + 15 : Math.max(65 * u + 15, Math.min(W * 0.18, 150))), y: H - 80 * u }; };
 // Animal buttons: on wide screens they sit between the animal and the food bowl (in two rows if one
 // row won't fit there). On phones they go above, in two rows so they stay big enough to tap.
 const BTN_GAP = 8;
@@ -339,11 +341,11 @@ const gapLeft = () => animalPos().x + 85 * ui();       // right edge of the pock
 const gapRight = () => bowlPos().x - 65 * ui();        // left edge of the bowl
 const baseBtn = () => Math.min(56 * Math.max(ui(), 0.8), W / 9);
 const gapBtn = count => (gapRight() - gapLeft() - 20) / count - BTN_GAP;   // button size if this many fit in the gap
-const fitsInGap = count => gapBtn(count) >= Math.min(34, baseBtn());     // buttons may shrink a little to fit
-const twoRows = () => W < 600 ? (W - 16) / ANIMALS.length - 8 < 40 : !fitsInGap(ANIMALS.length);
+const fitsInGap = count => gapBtn(count) >= Math.min(28, baseBtn());     // buttons may shrink a little to fit
+const twoRows = () => upright() ? (W - 16) / ANIMALS.length - 8 < 40 : !fitsInGap(ANIMALS.length);
 const perRow = () => twoRows() ? Math.ceil(ANIMALS.length / 2) : ANIMALS.length;
 const inGapSize = () => Math.min(baseBtn(), gapBtn(perRow()));
-const buttonsFit = () => W >= 600 && fitsInGap(perRow()) && 12 + (twoRows() ? 2 : 1) * (inGapSize() + BTN_GAP) <= 200 * ui();
+const buttonsFit = () => !upright() && fitsInGap(perRow()) && 12 + (twoRows() ? 2 : 1) * (inGapSize() + BTN_GAP) <= 200 * ui();
 const btnSize = () => buttonsFit() ? inGapSize() : Math.min(baseBtn(), twoRows() ? 52 : W / 9, (W - 16) / perRow() - 8);   // all buttons fit
 // If the buttons don't fit between the animal and the bowl, the pocket gets taller and they go on top.
 const pocketTop = () => H - 200 * ui() - (buttonsFit() ? 0 : (btnSize() + 16) + (twoRows() ? btnSize() + BTN_GAP : 0));
@@ -1377,6 +1379,35 @@ function drawTutorial() {
   }
 }
 
+// ---- Seasons (looks only): the game checks today's date ----
+let season = (() => { const m = new Date().getMonth(); return m === 9 ? 'fall' : m === 11 ? 'winter' : m === 1 ? 'love' : ''; })();
+const SEASON_TEXT = { fall: '🎃 Happy Halloween season!', winter: '❄️ Happy holidays!', love: "💕 Happy Valentine's month!" };
+function drawSeason(here, hz, top) {
+  if (!season) return;
+  const now = performance.now() / 1000;
+  if (season === 'fall') {
+    emoji('🎃', 0.36 * W, hz + 0.93 * (top - hz), 34); emoji('🎃', 0.8 * W, hz + 0.97 * (top - hz), 28);
+    if (here.underwater || here.name === 'The Moon') return;
+    for (let i = 0; i < 6; i++) {                                                   // falling leaves
+      const x = ((i * 173) % W) + Math.sin(now + i) * 30, y = (now * (30 + i * 6) + i * 90) % top;
+      emoji('🍂', x, y, 18);
+    }
+  } else if (season === 'winter') {
+    emoji('🎄', 0.44 * W, hz + 0.95 * (top - hz), 44);
+    if (here.underwater || here.name === 'The Moon' || here.name === 'The Mall') return;
+    ctx.fillStyle = '#fff';                                                          // snow everywhere
+    for (let i = 0; i < 35; i++) {
+      const x = ((i * 89) % W + Math.sin(now + i) * 10 + W) % W, y = (now * (22 + (i % 4) * 7) + i * 41) % top;
+      ctx.beginPath(); ctx.arc(x, y, 1.5 + (i % 3), 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (season === 'love') {
+    for (let i = 0; i < 5; i++) {                                                    // little hearts floating up
+      const x = ((i * 211) % W) + Math.sin(now * 1.5 + i) * 20, y = top - ((now * 25 + i * 120) % top);
+      ctx.globalAlpha = 0.7; emoji('💕', x, y, 18); ctx.globalAlpha = 1;
+    }
+  }
+}
+
 function drawPlace() {
   const here = place(), hz = horizon(), top = pocketTop();
   const sky = ctx.createLinearGradient(0, 0, 0, hz);
@@ -1567,6 +1598,7 @@ function drawPlace() {
     ctx.fillRect(0, hz + (top - hz) * 0.45, W, here.name === 'The School' ? 8 : 26);
   }
   for (const [fx, fy, e, size] of here.deco) emoji(e, fx * W, hz + fy * (top - hz), size);
+  drawSeason(here, hz, top);                           // pumpkins in October, snow in December...
 }
 
 function drawPocket() {
@@ -1711,6 +1743,7 @@ function draw() {
       const btnBottom = Math.max(...modeButtons().map(b => b.y + b.h));
       let y = Math.max(short ? H * 0.14 : H * 0.22, btnBottom + 10 + ss * 0.5);   // stay below the mode buttons
       label('💩 POOP POCKET 💩', W / 2, y, ss, '#ffe14d');
+      if (SEASON_TEXT[season]) label(SEASON_TEXT[season], W / 2, y + ss * 0.62, Math.min(16, W / 26), '#fff', true, 'center', W - 24);
       y += ss * 1.3;
       if (short) {
         y = para('Click the park to shoot poop at people. Out of poop? Drag the food to your animal\'s mouth.', W / 2, y, ts, '#fff', maxW) + ts * 0.5;
