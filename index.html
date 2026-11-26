@@ -121,6 +121,7 @@ function sfx(kind, animal) {
   if (kind === 'eww')    tone('square', 560, 240, 0.4, 0.07);
   if (kind === 'nom')    { tone('sine', 300, 450, 0.08, 0.3); tone('sine', 300, 450, 0.08, 0.3, 0.15); }
   if (kind === 'empty')  tone('triangle', 300, 140, 0.3, 0.25);
+  if (kind === 'combo')  { const f = 500 + Math.min(3, streak) * 150; tone('square', f, f * 1.5, 0.12, 0.06); }
   if (kind === 'power')  [660, 880, 1100, 1320, 1760].forEach((f, i) => tone('triangle', f, f, 0.1, 0.1, i * 0.05));
   if (kind === 'boss')   { tone('sawtooth', 110, 98, 0.5, 0.12); tone('sawtooth', 82, 73, 0.6, 0.12, 0.45); }
   if (kind === 'magic')  [880, 1175, 1568].forEach((f, i) => tone('sine', f, f * 1.02, 0.15, 0.08, i * 0.06));
@@ -236,6 +237,7 @@ function land(p) {
     const bodyY = person.y - size * 0.45;
     if (Math.abs(person.x - p.tx) < size * 0.4 + p.size * 0.4 &&
         Math.abs(bodyY - p.ty) < size * 0.55 + p.size * 0.3) {
+      if (!hits) bumpStreak(p.tx, p.ty);              // first hit of this poop counts toward the streak
       if (person.boss && person.hp > 1) {              // the boss needs 3 hits
         person.hp--; person.flash = 0.3; hits++;
         addText(person.x, person.y - size - 10, `OOF! ${person.hp} more!`, '#ff7ad9');
@@ -246,14 +248,26 @@ function land(p) {
       person.dir = person.x < W / 2 ? -1 : 1;        // run off the nearest side
       person.speed = 320; person.dodgeTime = 0; person.pause = 0;
       hits++;
-      const got = addPoints(person.points);
+      const got = addPoints(person.points * (person.boss ? 1 : Math.min(3, streak)));   // boss is always 10
       addText(person.x, person.y - size - 10, YUCKS[Math.floor(Math.random() * YUCKS.length)], '#fff');
       addText(person.x, person.y - size - 40, '+' + got, '#ffe14d');
     }
   }
   if (hits) sfx('eww');
   if (hits && tut === 1) tut = 2;
-  if (hits >= 2) { addPoints(hits); addText(p.tx, p.ty - 80, `COMBO x${hits}!`, '#ff7ad9'); }
+  if (hits >= 2) { addPoints(hits); addText(p.tx, p.ty - 110, `${hits} AT ONCE!`, '#9ff'); }
+}
+
+// ---- Combo streak: hit again within 2 seconds for x2, then x3 ----
+const STREAK_TIME = 2;
+let streak = 0, streakTimer = 0;
+function bumpStreak(x, y) {
+  streak = streakTimer > 0 ? streak + 1 : 1;
+  streakTimer = STREAK_TIME;
+  if (streak >= 2) {
+    addText(x, y - 80, `COMBO x${Math.min(3, streak)}!`, '#ff7ad9');
+    sfx('combo');
+  }
 }
 
 // ---- Feeding (the reload!) ----
@@ -380,7 +394,7 @@ function finishTutorial() {
 }
 function startLevel() {
   state = 'play'; timeLeft = LEVEL_TIME; levelScore = 0; spawnTimer = 0; bossSpawned = false;
-  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0;
+  powerups = []; powerTimer = 8; doubleTime = 0; superTime = 0; streak = 0; streakTimer = 0;
   people = []; poops = []; splats = []; texts = [];
   ANIMALS.forEach(a => a.ammo = a.maxAmmo);
   for (let i = 0; i < 3; i++) { spawnPerson(); people[people.length - 1].x = Math.random() * W; }
@@ -464,6 +478,8 @@ function update(dt) {
   if (spawnTimer <= 0) { spawnPerson(); spawnTimer = busy * (0.6 + Math.random() * 0.8); }
   if (isBossLevel() && !bossSpawned && !tut && timeLeft < LEVEL_TIME - 5) spawnBoss();
   if (!tut) updatePowerups(dt);
+  streakTimer = Math.max(0, streakTimer - dt);
+  if (streakTimer === 0) streak = 0;
 
   checkDodges(dt);
   movePeople(dt);
@@ -702,6 +718,7 @@ function draw() {
   const active = [];
   if (doubleTime > 0) active.push(`⭐ x2 ${Math.ceil(doubleTime)}s`);
   if (superTime > 0) active.push(`💥 ${Math.ceil(superTime)}s`);
+  if (streak >= 2) active.push(`🔥 x${Math.min(3, streak)}`);
   if (active.length) label(active.join('  '), hudX, 90, 16, '#fff');
   const a = ANIMALS[current];                                          // poop left in your animal
   for (let i = 0; i < a.maxAmmo; i++) {
